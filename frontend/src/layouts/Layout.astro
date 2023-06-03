@@ -1,0 +1,74 @@
+---
+export interface Props {
+	title: string;
+}
+
+const { title } = Astro.props;
+---
+
+<!DOCTYPE html>
+<html lang="en">
+	<head>
+		<meta charset="UTF-8" />
+		<meta name="viewport" content="width=device-width" />
+		<link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+		<meta name="generator" content={Astro.generator} />
+		<title>{title}</title>
+		<script>import flamethrower from 'flamethrower-router';
+			flamethrower({ prefetch: 'hover', log: true, pageTransitions: true });
+		</script>
+	</head>
+	<body>
+		<slot />
+		<footer></footer>
+	</body>
+</html>
+<style is:global>
+	:root
+	{
+		--mainbkg :  #222;
+		--secondbkg : #000;
+		--headertxt : #fff;
+		--maintext : #ccc;
+		--secondtext : #aaa;
+		--numcols : 3;
+		--psize : 1.25em;
+		color : var(--maintext);
+	}
+
+	html 
+	{
+		/* background-color: #222; */
+		background : radial-gradient(farthest-side circle at top, var(--mainbkg), var(--secondbkg));
+		/* background : linear-gradient(180deg, rgba(75.0,75.0,100.0,1.0), rgba(32.0,32.0,43.0,1.0)); */
+		min-height: 100vh;
+		font-family: system-ui, 'Open Sans', 'Helvetica Neue', sans-serif;
+	}
+
+	li
+	{
+		margin: .8em 0em;
+	}
+    footer
+    {
+        min-height: 1em;
+    }
+	body
+	{
+		margin:0;
+	}
+	@media (max-width : 1100px)
+	{
+		:root 
+		{
+			--numcols : 2;
+		}
+	}
+	@media (max-width : 550px)
+	{
+		:root
+		{
+			--numcols : 1;
+		}
+	}
+</style>

@@ -1,0 +1,322 @@
+---
+title : "Using p5.js In Markdown With Astro"
+description : "A quick tutorial for integrating p5.js in an Astro site"
+preview : "/images/previews/3.png"
+postnum : 3
+layout : '../../layouts/ArticleLayout.astro'
+date : '11/13/2022'
+tags : ['p5' ,'Astro']
+---
+
+import P5test from '../../components/P5test.astro';
+
+# Hello!
+
+This is the third post I'm writing on this blog! I'd like to write down some simple instructions on integrating p5.js, a nice
+library for creating interactive graphics like the one below, all in javascript. Try mousing over it!
+
+
+<P5test width='300' height='300' ></P5test>
+
+## Project Setup
+
+First you need to create the project 
+1. Follow the [instructions](https://docs.astro.build/en/getting-started/) on their website for creating a new Astro project.
+
+Then add some dependencies 
+1. npx astro add mdx
+2. npm i p5
+3. npm i --save-dev @types/p5 
+
+Mdx is a markdown extension for jsx that allows you to use web framework components in your markdown. Read about it [here](https://mdxjs.com/table-of-components/)  
+You can try out p5 in a sandbox [here](https://editor.p5js.org/).  
+The third step installs the type information for p5.js. 
+
+Now within the pages directory of your Astro project create a .mdx file and name it whatever you want.  
+Unlike the frontmatter in .astro files, a markdown file's header is YAML, and won't permit any javascript within it.  
+
+## The Markdown 
+
+To add a p5.js sketch to our page we need to make a custom component just for it, and then import it here.  
+I created one called 'p5test.astro' in the components folder, imported, and included it in my markdown with the following code:  
+
+```javascript
+
+
+    ---
+    title : "p5.js example in mdx"
+    ---
+
+    import P5test from '../components/P5test.astro';
+
+    <P5test  id='test' width='300' height='300' ></P5test>
+
+
+```
+Markdown is finnicky so make sure to leave empty lines around the import statement. Modify the path to your component as necessary. 
+
+## Making The Component 
+
+First off, here's some template code. Feel free to copy paste it and go from there if you're more interested in just getting it working than 
+learning how it works. 
+
+```astro 
+
+---
+interface Props
+{
+    width : number ,
+    height : number
+}
+const {width, height} = Astro.props;
+
+---
+
+<div id='p5test'>
+    {width},{height}
+</div>
+
+<style define:vars={{width, height}}>
+    div :global(canvas)
+    {
+        margin:0 auto;
+        display: block;
+    }
+</style>
+
+<script>
+    import P5 from 'p5';
+
+    let mydiv = document.getElementById('p5test') as HTMLElement;
+    const [w,h] = mydiv.innerText.split(',').map( (s)=>parseInt(s) );
+    mydiv.innerText="";
+    const sketch = (s :P5) => 
+    {
+        s.setup = () => 
+        {
+            s.createCanvas(w,h);
+        }
+
+        s.draw = () => 
+        {
+            s.background(0);
+            s.circle((s.width)/2, (s.height)/2, s.frameCount%(s.width/2));
+        }
+    }
+
+    const sketchInstance = new P5(sketch, mydiv ); //their function is incorrectly typed
+</script> 
+
+
+```
+
+## Examining The Component - Step By Step
+
+This is the component script. It specifies that this component takes 2 properties named width and height, and expects them to be a number.  
+
+We then destructure Astro.props to get access to the values passed in. 
+We explicitly want our p5 library to exist on the client so we *don't* import it here to use it for SSG or SSR.
+```astro 
+---
+interface Props
+{
+    width : number ,
+    height : number
+}
+const {width, height} = Astro.props;
+
+---
+```
+
+Astro doesn't support referencing those props from scripts that will run on the client - they're only alive on the server.
+
+We need to serialize them in a component and then read it back on the client.
+
+Also p5.js will create a canvas on initialization - we can tell it where to insert the canvas in the DOM if we specify this div by its id.
+Astro doesn't change IDs so I hard coded it, however if you wanted multiple of the exact same component on the page you could take 
+a similar approach as was taken with width and height. 
+```astro 
+
+<div id='p5test'>
+    {width},{height}
+</div>
+
+
+```
+
+Because the canvas doesn't exist yet when Astro generates the page, we need to explicitly break the styling-scoping that Astro provides to style 
+the canvas that p5.js will create and put in the div on the client. 
+
+This rule simply centers it - for some reason it's inline by default. 
+
+
+```astro 
+
+<style>
+    div :global(canvas)
+    {
+        margin:0 auto;
+        display:block;
+    }
+</style>
+
+
+```
+
+Now, an abridged version of the typescript to import p5, then use it to generate a canvas.
+
+This is the bare minimum you need to get a canvas onto your page. 
+You need to 
+
+- import p5 using a default import (no curly brackets), 
+- create a function that takes in a p5 instance and defines the setup and draw methods,
+- create a new instance of P5, passing in your function to its constructor.
+
+The stuff in the setup function will run once when the canvas draws its first frame, and draw will be called afterward and on each frame thereon.
+
+
+```typescript 
+
+<script>
+    import P5 from 'p5';
+
+    const sketch = (s :P5) => 
+    {
+        s.setup = () => 
+        {
+            s.createCanvas(200,200);
+        }
+
+        s.draw = () => 
+        {
+            s.background(0);
+            s.circle((s.width)/2, (s.height)/2, s.frameCount%(s.width/2));
+        }
+    }
+
+    const sketchInstance = new P5(sketch);
+</script> 
+
+
+```
+
+We want to be able to control the width and height and parent element of our canvas so we need to alter this. 
+We need to
+- read the contents from the div then get rid of them,
+- pass the div as an html element into P5 to designate it as the parent node,
+- and use the parsed width and height in s.createCanvas().
+
+```typescript 
+
+<script>
+    import P5 from 'p5';
+
+    let mydiv = document.getElementById('p5test') as HTMLElement;
+    const [w,h] = mydiv.innerText.split(',').map( (s)=>parseInt(s) );
+    mydiv.innerText="";
+    const sketch = (s :P5) => 
+    {
+        s.setup = () => 
+        {
+            s.createCanvas(w,h);
+        }
+
+        s.draw = () => 
+        {
+            s.background(0);
+            s.circle((s.width)/2, (s.height)/2, s.frameCount%(s.width/2));
+        }
+    }
+
+    const sketchInstance = new P5(sketch, mydiv ); //their function is incorrectly typed
+</script> 
+
+
+```
+
+## A Note On Function Syntax 
+When using the p5 editor, you can define functions like so
+
+```javascript
+function setup()
+{ 
+    // do a thing once
+}
+
+function draw()
+{
+    //do a thing many times
+}
+
+
+```
+
+When using p5 as a library, 
+you **must not** use this syntax to define setup, draw, or preload, or the browser will fail to draw the canvas and produce no helpful error message.
+
+## Using Flamethrower and Astro With P5 
+
+When using Astro, scripts are hoisted to the head and are expected to only run once. 
+When using Flamethrower, scripts in the head will only run once ever, even if we navigate around, and scripts in the body will run each time the page is navigated to. 
+Finally, there is a (bug?) with Astro where importing components and markdown runs their scripts - which is bad if they aren't included on the page, and means
+those scripts may not run when they're supposed to in the future.
+
+When these 3 things are combined, scripts you would normally want to run every time a new page is displayed, such as our script loading up the canvas, will 
+not run. 
+
+To work around this we need to wrap all of our functionality except importing p5 in a function, then run that on both the DOMCONTENTLOADED window event 
+for the case that the user navigated directly to the page, 
+and the flamethrower:router:end event, which fires every time the user navigates to the page from within the site.
+
+Note that it will execute from then on any time we load any page, and if we deregister it we won't be able to reregister it later. So it's best to have a check 
+at the beginning of the function that our div that we expect to be on the page is actually present before wasting any resources.
+
+The final script with all the modifications discussed above looks like this
+
+```typescript
+
+
+<script>
+    import P5 from 'p5';
+    
+    function drawP5Test ()
+    {
+        let mydiv = document.getElementById('p5test');
+        //console.log('no p5 component on this page - this is a bug in astro where it runs scripts of markdown that it only imported, but didnt display');
+        if(!mydiv){ return;}
+        const [w,h] = mydiv.innerText.split(',').map( (s)=>parseInt(s) ) ;
+        mydiv.innerText="";
+        const sketch = (s :P5) => 
+        {
+            s.setup = () => 
+            {
+                s.createCanvas(w,h);
+            }
+
+            s.draw = () => 
+            {
+                s.background(0);
+                s.circle((s.width)/2, (s.height)/2, s.frameCount%(s.width/2));
+            }
+        }
+
+        const sketchInstance = new P5( sketch, mydiv ); //their function is incorrectly typed
+        //use noloop and loop to stop and start the simulation
+    }
+    window.addEventListener('flamethrower:router:end' , drawP5Test);
+    window.addEventListener('DOMContentLoaded', drawP5Test);
+</script> 
+
+
+```
+
+## End - Notes on Liscencing
+That's pretty much it! For more experience and tutorials on using p5.js I highly recommend [The Coding Train](https://www.youtube.com/watch?v=17WoOqgXsRM&list=PLRqwX-V7Uu6ZiZxtDDRCi6uhfTH4FilpH) on Youtube. 
+Note that the library is LGPL 2.1 so using it in this way would require you to also liscence your product as LGPL 2.1.  
+You could alternatively download the library from a CDN to avoid 'redistributing' it, and avoid triggering the liscence conditions.  
+
+In my case, 
+1. You can't ship a Javascript application without shipping the source code in the first place, 
+2. This is a unmonitized personal blog, 
+
+So if they want to sue me they can do just that, because I want to have type annotations in my editor. 

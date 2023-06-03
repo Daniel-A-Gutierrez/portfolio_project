@@ -1,0 +1,28 @@
+---
+title : "Brutal N Queens"
+description : "Solving the hardest Rust problem on Code Wars"
+preview : "/images/previews/nqueens.png"
+postnum : 4
+layout : '../../layouts/ArticleLayout.astro'
+date : '1/1/1'
+tags : ['a' , 'b' , 'c']
+draft : true
+---
+
+It was uploaded in 2017 and I was the 13th person in the world solve it in Rust, and 212th for all languages, though around 9400 people have attempted it.  
+The problem is a brutal version of a problem from Machine Learning called N-Queens.  
+In the N queens problem your goal is to, given a chess board of dimension N (a normal board is 8x8 so N=8), arrange N queens on the board such that none are
+attacking eachother.
+
+This challenge was difficult for 3 reasons - 
+- The typical DFS implementation of the solution was only viable for board sizes up to around 28-30, before it just took too much time to complete.
+- The board sizes this problem tests on are up to 1000x1000 (computational difficulty scales exponentially for DFS).
+- Not only does the problem require around 10 different solutions to different boards in the 10 second time limit, the boards can also have no solution.
+
+I was able to solve it due to 4 key innovations
+- I created a genetic algorithm that maintains a population of 'boards' that reproduce based on their fitness - aka the amount of queens under attack.
+- The boards prioritize swapping queens that are under attack, and a list of pairs of attacking queens is created optimally while the board is generated.
+- The boards were able to be cloned, mutated, and evaulated extremely efficiently, doing so in a single iteration and without any memory allocations.
+- I realized all unsolvable boards followed a pattern, and automatically failed boards that matched it. 
+
+From there, I just optimized the population size and threw rayon at it, and soon enough I could solve those 1000x1000 boards in milliseconds. The code for my solution is available [here](https://github.com/Daniel-A-Gutierrez/rust_sandbox/blob/master/src/experiments/refactored_nqueens.rs).

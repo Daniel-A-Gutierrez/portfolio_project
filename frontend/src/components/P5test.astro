@@ -1,0 +1,115 @@
+---
+interface Props
+{
+    width : number ,
+    height : number
+}
+const {width, height} = Astro.props;
+
+---
+
+<div id='p5test'>
+{width},{height}
+</div>
+
+<style >
+    div :global(canvas)
+    {
+        margin:0 auto;
+        display:block;
+    }
+</style>
+
+<script>
+    let mydiv = document.getElementById('p5test');
+        
+    import P5 from 'p5';
+        
+    function drawP5Test ()
+    {
+        let mydiv = document.getElementById('p5test');
+        //console.log('no p5 component on this page - this is a bug in astro where it runs scripts of markdown that it only imported, but didnt display');
+        if(!mydiv){ return;}
+
+        
+        const [w,h] = mydiv.innerText.split(',').map( (s)=>parseInt(s) ) ;
+        mydiv.innerText="";
+        const sketch = (s :P5) => 
+        {
+            var d2r ; 
+            let scale = 6;
+            var remap : (arg0: number)=>number;
+            var demap : (arg0: number)=>number;
+            type v2 = {x:number, y:number};
+            s.setup = () =>  
+            {
+                s.createCanvas(w,h);
+                s.colorMode(s.HSL,360,100,100,1);
+                s.background(255);
+                s.frameRate(15); //comment (add // ) to increase fluidity and reponsiveness.
+                // //noLoop();
+                // //frameRate(60);
+                s.rectMode(s.CENTER);
+                s.strokeWeight(2);
+                s.fill(0,0,0,0);
+                d2r = 2*s.PI/360;
+                remap = (a : number) => s.map(a,-scale,scale,0,s.width); //from scale space to screen space 
+                demap = (a : number) => s.map(a,0,s.width,-scale,scale); //from screen space to scale space
+            }
+
+
+            s.draw = () =>
+            {
+                complexSeries( 
+                    s.createVector(demap(s.mouseX) ,demap(s.mouseY),0),
+                    {x:0,y:0});
+            }
+
+            function complexMult(a:v2,b:v2)
+            {
+                let cx = a.x*b.x-a.y*b.y;
+                let cy = a.x*b.y+a.y*b.x;
+                return {x:cx, y:cy} ;
+            }
+
+            function complexAdd(a:v2,b:v2)
+            {
+                return {x:a.x+b.x, y:a.y+b.y};
+            }
+
+            //let z be a vector with length one and c be an arbitrary vector which we will repeatedly add. 
+            function complexSeries(z: P5.Vector,c : v2)
+            { 
+                //text following '//' are comments
+                scale = 1.5; 
+                s.background(0); //try changing this to 0 or 255
+                let zmag = z.mag() ;
+                let inv = 1/zmag;
+                //uncomment the next line to add more precision to the mouse near the circle
+                z.setMag( Math.pow(z.mag(),1/8));
+                s.point(remap(z.x),remap(z.y),3);
+                s.stroke(255,255,255,96);                     // at the beginning to comment 
+                //this line controls the color 
+                let col = s.color(180 , 50 , 50, .25 );       //hue (0-360), saturation(0-100), luminance(0-100), alpha(0-1)
+                let p = {x:1,y:0};
+                let previous = p;
+                for(let i = 0 ; i < 125; i++)       //this loop draws all the points 
+                {
+                    p = complexMult(p,z);
+                    p = complexAdd(p,c);
+                    col = s.color(s.map(i,0,250,100,150), 100, s.map(i,0,250,0,50), 1); //HSLA
+                    s.stroke(col);
+                    s.fill(col);
+                    s.line(remap(p.x),remap(p.y), remap(previous.x),remap(previous.y));
+                    s.strokeWeight(2);
+                    previous = p;
+                }
+            }
+        }
+
+        const sketchInstance = new P5( sketch, mydiv ); //their function is incorrectly typed
+        //use noloop and loop to stop and start the simulation
+    }
+    window.addEventListener('flamethrower:router:end' , drawP5Test);
+    window.addEventListener('DOMContentLoaded', drawP5Test);
+</script> 

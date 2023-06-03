@@ -1,0 +1,70 @@
+---
+import HomeLayout from '../layouts/HomeLayout.astro';
+import type {FM} from '../types';
+// import ArticlePreview from '../components/ArticlePreview.astro';
+import RedditStylePreview from '../components/RedditStylePreview.astro';
+const posts = await Astro.glob<FM>( "./posts/*.mdx");
+---
+
+<HomeLayout title="Home">
+	<a href="/about" slot='link2'>About</a>
+	<a href="/contact" slot='link3'>Contact</a>
+	<div class="blogtitle">
+		<h1>Blog</h1>
+		<p>Personal Website of Daniel Gutierrez</p>
+	</div>
+	<main class='posts-holder'>
+		{posts
+		.sort( (a,b) => {return b.frontmatter.postnum - a.frontmatter.postnum} )
+		.map( post => <RedditStylePreview 
+			title={post.frontmatter.title} 
+			description={post.frontmatter.description}
+			preview={post.frontmatter.preview}
+			url={post.url ? post.url : ""}
+			tags={[...post.frontmatter.tags]}
+			cold={post.frontmatter.cold}></RedditStylePreview>)
+		}<!--Turns out you need to spread the array because of serialization reasons?-->
+	</main>
+</HomeLayout>
+
+<style>
+
+.blogtitle
+{
+	border-bottom: 1px solid grey;
+	width:66%;
+	margin : 100px auto;;
+}
+
+.blogtitle>h1
+{
+	text-align: center;
+	color: #fff;
+	font-size: 2.5em;
+}
+
+.blogtitle>p
+{
+	text-align: center;
+	font-size: 1.25em;
+	color:#ccc;
+}
+
+.posts-holder
+{
+	display:grid;
+	/* grid-template-columns:repeat(var(--numcols),1fr); */
+	grid-template-columns: 1fr;
+	gap:25px;
+	margin-top:100px;
+	grid-auto-rows: 1fr;
+	width:66%;
+	margin-left: auto;
+	margin-right:auto;
+}
+
+@media(width<500px)
+{
+	.posts-holder{width:95%;}
+}
+</style>

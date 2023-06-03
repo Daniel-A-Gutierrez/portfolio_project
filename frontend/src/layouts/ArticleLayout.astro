@@ -1,0 +1,105 @@
+---
+export interface Props {
+	title : string
+	description : string
+	preview : string
+	postnum : number
+	date : string
+	layout : string
+	tags : [string]
+}
+
+
+import Layout from "./Layout.astro"
+const {frontmatter} = Astro.props; //frontmatter = astro.props.frontmatter
+const dbg = JSON.stringify(frontmatter);
+---
+<Layout title = {frontmatter.title}>
+	<article>
+		<div class='topbar'>
+			<div><a class='homelink' href="/">←</a></div>
+			<h4>{frontmatter.date}</h4>
+		</div>
+		<h1>{frontmatter.title}</h1>
+		<slot></slot>
+		<footer>Tags : {frontmatter.tags.map( (x:string) => <a>{x}&nbsp;</a> )}</footer>
+	</article>
+
+
+<style is:global>
+		h2
+		{
+			margin-top:30px;
+		}
+		p, li
+		{
+			font-size: var(--psize);
+			line-height : 1.65em;
+		}
+		a:visited, a
+		{
+			color:inherit;
+		}
+		a:hover
+		{
+			color: var(--secondtext);
+		}
+	</style>
+</Layout>
+<style>
+	article
+	{
+		width:60%;
+		margin:auto;
+	}
+	.topbar
+	{
+		display:flex;
+		flex-direction:row;
+		justify-content: space-between;
+		align-content:center;
+	}
+	.topbar>div
+	{
+		align-self:center;
+	}
+	.homelink
+	{
+		color: var(--maintext);
+		text-decoration: inherit;
+		font-size:2em;
+	}
+
+	.homelink:hover
+	{
+		color : var(--secondtext);
+	}
+	h1
+	{
+		font-size:3em;
+		padding : 10px;
+		border-bottom: 1px solid var(--secondtext);
+		text-align: center;
+	}
+	h4
+	{
+		font-size:1.25em;
+		text-align: right;
+		color: #ddd;
+		font-weight:light;
+	}
+	footer
+	{
+		border-top: 1px solid var(--secondtext);
+		margin-top:20px;
+		padding:20px 0px;
+	}
+
+	@media(max-width:500px)
+	{
+		article
+		{
+			width:90%;
+		}
+	}
+</style>

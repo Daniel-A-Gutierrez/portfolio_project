@@ -1,0 +1,112 @@
+---
+interface Props
+{
+    title : string,
+    description : string,
+    preview : string,
+    url : string,
+    tags : [string],
+    cold : boolean
+}
+const {title, description, preview, url, tags, cold} = Astro.props;
+---
+<article>
+        <div class="textholder">
+            <a href={url} class:list={[cold&&'cold']}><h2>{title}</h2></a>
+            <p class='tags'>
+                Tags:{tags.map( (tag) => <a class='tag'> &nbsp;{tag}&nbsp; </a> )}
+            </p>
+            <p>{description}</p>
+            <a href={url}><p class='underlined'>Read →</p></a>
+        </div>
+        <a href={url}>
+            <div class='previewholder'>
+                <img src={preview} alt = 'preview image'>
+            </div>
+        </a>
+</article>
+
+<script>
+    //astro doesnt support dynamic tags so gotta do it on the client
+    //nvm i found a different work around using window events, no need for data-cold
+    //document.querySelectorAll('a.cold').forEach( (e) => {e.setAttribute("data-cold", "");});
+</script>
+
+<style>
+    .tag
+    {
+        color: rgba(185, 93, 185, 0.4);
+    }
+
+    .tag:hover
+    {
+        text-decoration:underline;
+    }   
+    .underlined
+    {
+        text-decoration: underline;
+    }
+    .previewholder
+    {
+        width:100%;
+        height:90%;
+    }
+    .textholder
+    {
+        margin-left: .25em;
+        width:90%;
+    }
+    h2
+    {
+        font-size: 1.75em;
+        margin-top:0px;
+        /* padding-top:20px; */
+        margin-bottom: 0px;
+        text-overflow: ellipsis;
+        display: -webkit-box;
+        -webkit-line-clamp: 2;
+        -webkit-box-orient: vertical;
+        overflow:hidden;
+        color: var(--headertxt);
+    }
+    p
+    {  
+        overflow: hidden;
+        text-overflow: ellipsis;
+        margin-top: 0px;
+        display: -webkit-box;
+        -webkit-line-clamp: 2;
+        -webkit-box-orient: vertical;
+        font-size : 1.25em;
+    }
+    .tags
+    {
+        font-size:1em;
+        
+    }
+    img
+    {
+        left:-1px;
+        object-fit:cover;
+        width:100%;
+        height:100%;
+        border-radius: 6px;
+    }
+    article
+    {
+        margin-left: auto;
+        margin-right: auto;
+        display:grid;
+        grid-template-columns: .8fr .2fr;
+        width:100%;
+        border-bottom: 1px solid grey;
+    }
+    a
+    {
+        color:inherit;
+        text-decoration: inherit;
+        min-height: 1.5em;
+        display:inline-block;
+        box-sizing: border-box;
+    }
+</style> 

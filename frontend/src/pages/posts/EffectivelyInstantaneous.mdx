@@ -1,0 +1,88 @@
+---
+title : "From \"Blazingly Fast\" To Effectively Instantaneous"
+description : "A tour of the web technology I use to achieve single frame page loads"
+preview : "/images/previews/fireship.png"
+postnum : 5
+layout : '../../layouts/ArticleLayout.astro'
+date : '11/10/2022'
+tags : ['Astro', 'Flamethrower', 'Performance']
+draft : false
+---
+import Image from '../../components/Image.astro';
+
+Here's a list of things your computer can do in under 16.67ms : 
+- [Procedurally generate this mine cart animation](https://www.shadertoy.com/view/Ms2fWW)
+- [Run a 100 node cloth simulation](https://www.shadertoy.com/view/4dG3R1)
+- [Iterate over 400MB of RAM](https://www.transcend-info.com/Support/FAQ-292)
+- [Guess 4.8 Billion Password Hashes (if you have an RTX 4090)](https://www.tomshardware.com/news/eight-rtx-4090s-can-break-passwords-in-under-an-hour)
+- [Simulate every particle in a game of Noita](https://thumbs.gfycat.com/AbandonedDownrightAmurratsnake-size_restricted.gif)
+
+In the year 2022 theres no reason why a simple webpage should take much longer than that to load on good hardware with a good connection.
+
+The technologies I use in this website to achieve that are :  
+
+<Image src='../images/astroflamethrower.png' maxwidth='400px'></Image>
+
+1. Astro - a super lightweight framework that prerenders everything at build time and boasts intercompatibility with every other major framework.
+2. Flamethrower - a client side router that pre fetches visible links and intercepts page transitions to convert a multi page app to a single page one. 
+
+That's all, just 2 pieces of software for my front end. Astro can also handle api endpoints so I could deploy on Netlify and use SSR 
+and be done. The flexibility afforded by that simplicity has advantages too - 
+
+- I could write a simple server with Axum.rs, integrate Postgres into it with Diesel, and deploy the whole thing on Linode as a static site, if I needed to 
+make a website like Wikipedia or the Internet Archive, which just need to serve a huge amount of static pages efficiently. 
+- I could target a microprocessor and write a simple static file server in C using the Arduino libraries and just serve up the compiled build folder, which, minus the images, is only 11KB.
+With the (unoptimized) images its 856KB. That's small enough to be viable for even embedded devices like the esp32, which have wifi compatibility but less than 4MB of onboard storage. 
+
+## When To Consider Flamethrower + Astro
+
+The argument could be made for many websites that it doesn't make economic sense for them to make their service so responsive - prefetching the amount of links present 
+in a Wikipedia article would blow up their server bandwidth dozens of times over.
+
+Fortunately though Flamethrower offers you the option to only prefetch links when the user starts hovering over them - the
+body swap done in js is much faster and more responsive than an entire page load, and it preserves state between pages. 
+
+## Setup Instructions
+
+The project setup using this stack with rust is as follows (skip to step 5 if you don't care about Rust): 
+
+1. make a git repo with rust gitignore
+2. open with vs code
+3. initialize new rust project by typing the following in the terminal : cargo new 
+4. copy paste the cargo.toml below 
+5. make a new folder in project root beside src, make astro project following instructions on their [github](https://docs.astro.build/en/getting-started/)
+6. if you want to use svelte : npx astro add svelte
+7. npm i flamethrower-router
+8. go to layout.astro and add the import lines to the layout.astro file's head.
+```javascript
+    <script>
+        import flamethrower from 'flamethrower-router';
+        flamethrower({ prefetch: 'visible', log: true, pageTransitions: false });
+    </script>
+```
+
+For an example file based router if you're going the pure static site generator route with astro, look at [this example](https://github.com/tokio-rs/axum/blob/main/examples/static-file-server/src/main.rs)
+
+Cargo.toml 
+```toml
+[package]
+name = "axum-sandbox"
+version = "0.1.0"
+edition = "2021"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[dependencies]
+axum = "0.5.16"
+tokio = {version="1.0", features=["full"]}
+serde = "1.0.145"
+axum-extra = {version="0.3.7" , features=["spa"]}
+tower-http = {version="0.3.0" , features=["fs" , "trace"]}
+tracing = "0.1"
+tracing-subscriber = {version="0.3", features=["env-filter"]}
+```
+
+And voila, you've got a static site that should be as fast as it possibly can be. You don't have dynamic routes with this, unless you can figure out
+how to make Astro generate a page from Rust.
+
+I think going forward I'm going to attempt making some copycat sites in this style to illustrate just how wasteful some web applications are.

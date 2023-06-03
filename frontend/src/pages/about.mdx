@@ -1,0 +1,50 @@
+---
+title: 'about'
+layout: '../layouts/HomeLayout.astro'
+leftlink : '/'
+lefttext : 'Blog'
+rightlink : '/contact'
+righttext : 'Contact'
+---
+[comment]: <> (another note - comments dont work in mdx, the javascript still runs or causes undefined behavior.)
+[comment]: <> (//named imports import a specific thing exported by the module with the same name)
+[comment]: <> (last comment - my image implementation is better. going back to it )
+
+import Image from '../components/Image.astro'; 
+
+# About
+---
+
+
+<Image src='/images/me%20at%20pier.jpeg' alt='me at a pier' maxwidth='400px'></Image>
+
+My name is Daniel Gutierrez, and this is my personal blog.  
+
+I'm a software engineer that values performance and enjoys teaching with a wide range of technical experience.  
+This blog was made with Astro and Flamethrower.js and deployed on Netlify, and may be upgraded to a server written with Axum.rs and deployed on Linode in the near future. 
+
+### Experience
+I've done the following in a professional capacity
+
+- Electrical Engineering, designing market ready PCBs on EasyEDA to extend the functionality of the ESP32 
+microprocessor to interface with Lego hardware and safely manage an internal LiPo (effectively competing with their $300 Mindstorm for $15),
+- Embedded Software, using micropython to create a tiny webserver and website that allowed remote block based programming of the ESP32, 
+- Python Programming, writting robotics libraries for internal use that implement inverse kinematics as 
+well as interface with a variety of hardware such as encoders, servos, and sonar,
+- Computer Graphics and Javascript Programming, creating a few dozen interactive mathematical and physics [examples](https://editor.p5js.org/Daniel-A-Gutierrez/sketches) using p5.js for a generative art and math curriculum I created,
+- Data Science, analyzing an RNASeq dataset using R to identify candidate genes of interest for the Wood Lab at UCI,
+- Rust Programming, creating an interpreter for a mock assembly language in Rust,
+- Game Development, teaching a VR/AR and multiplayer game development using Unity in 2019,
+- Full Stack Web Development, rewriting [windtreeeducation.org](http://www.windtreeeducation.org) to use vanilla js / css + webcomponents instead of wordpress, and a netlify host instead of network solutions, improving page loads from ~15s to around ~1s. The new site also has dynamic pages for each school to register for classes, instead of requiring a new webpage and form for each school, and all the content is managed from a google sheet for ease of use.
+
+And just for fun I have
+- Solved the [hardest problem on codewars.com available in Rust](https://www.codewars.com/kata/5985ea20695be6079e000003). It was uploaded in 2017 and when I completed it in August 2022, I was the 13th person to do so in Rust, and 212th overall, with over 9000 others attempting it. My code is visible [here](https://github.com/Daniel-A-Gutierrez/rust_sandbox/blob/master/src/experiments/refactored_nqueens.rs) - article coming soon!
+- Created around a dozen almost decent games that net me over $.50 ! I'm not linking them.
+
+### What Am I Up To?
+
+11/6/2022 : I've settled on Astro as a framework. I tried React and Svelte - hated React, Svelte was cool, but Astro is just better for the types of websites
+I'm trying to make right now. Also I did some database tutorials. MongoDB is cool, I like Postgres a lot. I think I'm going to try learning 
+Flamethrower.js + Astro + Axum + Postgres. Also, planned the Hawaii trip last night!
+
+10/14/2022 : Got carpal tunnel in both my wrists so I've taken a few weeks off of gaming/programming. 
