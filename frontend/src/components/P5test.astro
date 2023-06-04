@@ -46,7 +46,7 @@ const {width, height} = Astro.props;
                 s.createCanvas(w,h);
                 s.colorMode(s.HSL,360,100,100,1);
                 s.background(255);
-                s.frameRate(15); //comment (add // ) to increase fluidity and reponsiveness.
+                s.frameRate(24); //comment (add // ) to increase fluidity and reponsiveness.
                 // //noLoop();
                 // //frameRate(60);
                 s.rectMode(s.CENTER);
@@ -60,11 +60,18 @@ const {width, height} = Astro.props;
 
             s.draw = () =>
             {
+                if( notInBounds(s.mouseX,s.mouseY,s.width,s.height) ) {return}
+
                 complexSeries( 
                     s.createVector(demap(s.mouseX) ,demap(s.mouseY),0),
                     {x:0,y:0});
             }
 
+            function notInBounds(x : number,y : number,width : number,height : number)
+            {
+                return x<0 || x > width || y<0 || y > height
+            }
+            
             function complexMult(a:v2,b:v2)
             {
                 let cx = a.x*b.x-a.y*b.y;

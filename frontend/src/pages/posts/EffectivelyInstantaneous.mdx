@@ -21,7 +21,7 @@ In the year 2022 theres no reason why a simple webpage should take much longer t
 
 The technologies I use in this website to achieve that are :  
 
-<Image src='../images/astroflamethrower.png' maxwidth='400px'></Image>
+<Image src='../../images/astroflamethrower.png' maxwidth='400px'></Image>
 
 1. Astro - a super lightweight framework that prerenders everything at build time and boasts intercompatibility with every other major framework.
 2. Flamethrower - a client side router that pre fetches visible links and intercepts page transitions to convert a multi page app to a single page one. 
@@ -84,5 +84,3 @@ tracing-subscriber = {version="0.3", features=["env-filter"]}
 
 And voila, you've got a static site that should be as fast as it possibly can be. You don't have dynamic routes with this, unless you can figure out
 how to make Astro generate a page from Rust.
-
-I think going forward I'm going to attempt making some copycat sites in this style to illustrate just how wasteful some web applications are.
