@@ -5,17 +5,18 @@ interface Props
     description : string,
     preview : string,
     url : string,
-    tags : [string],
-    cold : boolean
+    date : string,
 }
-const {title, description, preview, url, tags, cold} = Astro.props;
+const {title, description, preview, url, date} = Astro.props;
 ---
 <article>
         <div class="textholder">
-            <a href={url} class:list={[cold&&'cold']}><h2>{title}</h2></a>
-            <p class='tags'>
-                Tags:{tags.map( (tag) => <a class='tag'> &nbsp;{tag}&nbsp; </a> )}
-            </p>
+            <a href={url} class:list={['cold']}><h2>{title}</h2></a>
+            <div class='date'>
+                Date: {date}
+                <!-- Tags:{tags.map( (tag) => <a class='tag'> &nbsp;{tag}&nbsp; </a> )} -->
+            </div>
+            <br>
             <p>{description}</p>
             <a href={url}><p class='underlined'>Read →</p></a>
         </div>

@@ -1,9 +1,9 @@
 ---
 import HomeLayout from '../layouts/HomeLayout.astro';
-import type {FM} from '../types';
+import { getCollection, getEntries, getEntry } from 'astro:content';
 // import ArticlePreview from '../components/ArticlePreview.astro';
 import RedditStylePreview from '../components/RedditStylePreview.astro';
-const posts = await Astro.glob<FM>( "./posts/*.mdx");
+const posts = await getCollection('blog');
 ---
 
 <HomeLayout title="Home">
@@ -14,15 +14,14 @@ const posts = await Astro.glob<FM>( "./posts/*.mdx");
 		<p>Personal Website of Daniel Gutierrez</p>
 	</div>
 	<main class='posts-holder'>
-		{posts
-		.sort( (a,b) => {return b.frontmatter.postnum - a.frontmatter.postnum} )
-		.map( post => <RedditStylePreview 
-			title={post.frontmatter.title} 
-			description={post.frontmatter.description}
-			preview={post.frontmatter.preview}
-			url={post.url ? post.url : ""}
-			tags={[...post.frontmatter.tags]}
-			cold={post.frontmatter.cold}></RedditStylePreview>)
+		{ 
+			posts.sort( (a,b) => {return b.data.postnum - a.data.postnum} )
+			.map( post => <RedditStylePreview 
+			title={post.data.title} 
+			description={post.data.description}
+			preview={post.data.preview}
+			url={ '/posts/' + post.id}
+			date={post.data.published}></RedditStylePreview>)
 		}<!--Turns out you need to spread the array because of serialization reasons?-->
 	</main>
 </HomeLayout>
