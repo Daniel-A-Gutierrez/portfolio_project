@@ -7,6 +7,39 @@ published : '10/17/2025'
 layout : '../layouts/PicoArticleLayout.astro'
 tags : ['c']
 ---
-# Hello!
+import Image from '../components/Image.astro';
 
-## This is the first post
+## Why ? 
+
+<div style="display:flex; flex-direction:horizontal">
+    <Image src='../../images/UnevenImages.png' maxwidth='350px' alt='Uneven images on the blog page.'/>
+    <Image src='../../images/UnevenWidths.png' maxwidth='500px' alt='Uneven images on the blog page.'/>
+</div>
+## First order of business : Importing Pico
+
+I made the initial mistake of not looking for scss specific instructions for this - 
+the documentation says to simply do 
+``` scss
+    @use "pico"
+```
+
+Yeah its not that simple, but after lots of tinkering I've landed at the following
+``` scss
+	@use "@picocss/pico/scss/pico" with 
+	(
+		$theme-color: "violet", 
+		$parent-selector:".pico",
+		$breakpoints: (
+			sm: (root-font-size: 85%),
+			md: (root-font-size: 90%,),
+			lg: (root-font-size: 95%),
+			xl: (root-font-size: 100%,),
+			xxl: (root-font-size: 105%,)
+  		),);
+```
+Despite the specification of parent selector, which normally makes pico only affect things 
+inside of a '.pico' classed container, typography seems to be the exception to that rule, so
+overriding some variables there is necessary. 
+
+I've also discovered that astro makes no guarantees about rule ordering for css so variables
+need to be overridden with ```!important```, which is kind of annoying.

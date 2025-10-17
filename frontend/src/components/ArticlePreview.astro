@@ -5,13 +5,11 @@ interface Props
     description : string,
     preview : string,
     url : string,
-    cold : false
 }
-let {title, description, preview, url, cold} = Astro.props;
-let datacold = 'data-cold'; //stupid that this is necessary
+let {title, description, preview, url} = Astro.props;
 ---
 <article>
-    <a href={url} { (cold ? {datacold} : {}) }>
+    <a href={url}>
         <div class='previewholder'><img src={preview} alt = 'preview image'></div>
         <div class="textholder">
             <h2>{title}</h2>
@@ -20,6 +18,7 @@ let datacold = 'data-cold'; //stupid that this is necessary
     </a>
 </article>
 <style>
+
     .previewholder
     {
         width:100%;

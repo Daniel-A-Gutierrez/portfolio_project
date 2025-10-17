@@ -14,10 +14,6 @@ const { title } = Astro.props;
 		<link rel="icon" type="image/svg+xml" href="/favicon.svg" />
 		<meta name="generator" content={Astro.generator} />
 		<title>{title}</title>
-		<!-- <script>import flamethrower from 'flamethrower-router';
-			flamethrower({ prefetch: 'hover', log: true, pageTransitions: true });
-		</script> -->
-		<!-- <script>import "@hotwired/turbo";</script> -->
 		 <ClientRouter  fallback="none"/>
 	</head>
 	<body transition:animate='none'>
@@ -25,6 +21,31 @@ const { title } = Astro.props;
 		<footer></footer>
 	</body>
 </html>
+
+<style lang="scss" is:global>
+
+	//holy shit finally found the proper way. 
+	@use "@picocss/pico/scss/pico" with 
+	(
+		$theme-color: "violet", 
+		$parent-selector:".pico",
+		$breakpoints: (
+			sm: (root-font-size: 85%, viewport: 95%),
+			md: (root-font-size: 90%, viewport: 90%),
+			lg: (root-font-size: 95%, viewport : 80%),
+			xl: (root-font-size: 100%, viewport: 75%),
+			xxl: (root-font-size: 105%, viewport : 66%)
+  		),);
+	//reconfig to match pico 
+	$flexboxgrid-breakpoints: (
+		sm 36rem 37rem,
+		md 48rem 49rem,
+		lg 64rem 65rem,
+		xlg 80rem 81rem,
+		xxl 96rem 97rem )	;
+	@use "flexboxgrid-sass/flexboxgrid.scss" ;
+</style>
+
 <style is:global>
 	:root
 	{
@@ -38,39 +59,28 @@ const { title } = Astro.props;
 		color : var(--maintext);
 	}
 
+	/*pico overrides*/
 	html 
 	{
-		/* background-color: #222; */
-		background : radial-gradient(farthest-side circle at top, var(--mainbkg), var(--secondbkg));
-		/* background : linear-gradient(180deg, rgba(75.0,75.0,100.0,1.0), rgba(32.0,32.0,43.0,1.0)); */
-		min-height: 100vh;
-		font-family: system-ui, 'Open Sans', 'Helvetica Neue', sans-serif;
+		/* --pico-font-size: 100% !important; */
+		/* --pico-text-selection-color: #00000000 !important; */
+		--pico-card-background-color: #00000000 !important;
+		--pico-card-sectioning-background-color: #00000000 !important;
+
+		--pico-background-color: #00000000 !important;
+		/* --pico-primary: #00000000 !important; */
+		--pico-primary-background: #00000000 !important;
+		/* --pico-primary-underline: #00000000 !important;
+		--pico-primary-hover: #00000000 !important;
+		--pico-primary-hover-background: #00000000 !important;
+		--pico-primary-focus: #00000000 !important; */
+		--pico-primary-inverse: #ffffffff !important;
 	}
 
-	li
+	html 
 	{
-		margin: .8em 0em;
-	}
-    footer
-    {
-        min-height: 1em;
-    }
-	body
-	{
-		margin:0;
-	}
-	@media (max-width : 1100px)
-	{
-		:root 
-		{
-			--numcols : 2;
-		}
-	}
-	@media (max-width : 550px)
-	{
-		:root
-		{
-			--numcols : 1;
-		}
+		background : radial-gradient(farthest-side circle at top, var(--mainbkg), var(--secondbkg));
+		min-height: 100vh;
+		font-family: system-ui, 'Open Sans', 'Helvetica Neue', sans-serif;
 	}
 </style>
