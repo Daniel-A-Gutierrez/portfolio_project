@@ -43,3 +43,23 @@ https://stackoverflow.com/questions/57957973/npm-cannot-find-module-semver-after
 
 for putting a gui on it : https://www.youtube.com/watch?v=ODhGNe0s4lI
 
+## 10/16/2025
+Ok , updated the astro version. There were major breaking changes - content collections are 
+a more complicated but flexible replacement for 'posts'. Also the client router is now built into astro so I dont need flamethrower anymore.
+
+I'm going to start a major redesign also, using picocss and flexbox-grid, so I can do some interactive 
+stuff with svelte. 
+
+```yarn add sass @picocss/pico flexboxgrid-sass```
+
+I think i just import these in the layout now? 
+I want to restrict this to a post first so i'll make a separate layout. 
+
+moved posts to src/posts and left just the dynamic route in src/pages/posts to prevent duplicate articles
+apparently the layout frontmatter property isnt special anymore? 
+I think that means i have to have 1 layout for all my posts right? 
+Broadly what im trying to do here is have different layouts for different posts... so that sucks.
+It does work though so unfortunately I think I have to rely on it.
+
+Ok i'm going to get some air then lets make a page with pico. 
+I think i should start by seeing the unstyled markdown looks like. 

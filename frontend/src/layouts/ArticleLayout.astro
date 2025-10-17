@@ -1,16 +1,17 @@
 ---
-export interface Props {
+import type { MarkdownLayoutProps } from "astro";
+import Layout from "./Layout.astro";
+
+type Props = MarkdownLayoutProps< {
 	title : string
 	description : string
 	preview : string
 	postnum : number
-	date : string
+	published : string
 	layout : string
-	tags : [string]
-}
-
-
-import Layout from "./Layout.astro"
+	tags : undefined | string[]
+	draft : undefined | boolean
+}>;
 const {frontmatter} = Astro.props; //frontmatter = astro.props.frontmatter
 const dbg = JSON.stringify(frontmatter);
 ---
@@ -18,11 +19,11 @@ const dbg = JSON.stringify(frontmatter);
 	<article>
 		<div class='topbar'>
 			<div><a class='homelink' href="/">←</a></div>
-			<h4>{frontmatter.date}</h4>
+			<h4>{frontmatter.published}</h4>
 		</div>
 		<h1>{frontmatter.title}</h1>
 		<slot></slot>
-		<footer>Tags : {frontmatter.tags.map( (x:string) => <a>{x}&nbsp;</a> )}</footer>
+		{frontmatter.tags && <footer>Tags : {frontmatter.tags?.map( (x:string) => <a>{x}&nbsp;</a> )}</footer>}
 	</article>
 
 

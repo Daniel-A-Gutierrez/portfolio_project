@@ -5,7 +5,7 @@ import { defineCollection, z } from 'astro:content';
 import { glob, file,  } from 'astro/loaders';
 
 // 3. Define your collection(s)
-const blog = defineCollection({ loader : glob({base : "src/pages/posts", pattern : "*.mdx" } ),
+const blog = defineCollection({ loader : glob({base : "src/posts", pattern : "*.mdx" } ),
     schema : z.object({
         title : z.string(),
         description : z.string(),

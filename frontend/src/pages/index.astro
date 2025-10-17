@@ -16,12 +16,14 @@ const posts = await getCollection('blog');
 	<main class='posts-holder'>
 		{ 
 			posts.sort( (a,b) => {return b.data.postnum - a.data.postnum} )
-			.map( post => <RedditStylePreview 
-			title={post.data.title} 
-			description={post.data.description}
-			preview={post.data.preview}
-			url={ '/posts/' + post.id}
-			date={post.data.published}></RedditStylePreview>)
+			.map( post => 
+			<RedditStylePreview 
+				title={post.data.title} 
+				description={post.data.description}
+				preview={post.data.preview}
+				url={ '/posts/' + post.id}
+				date={post.data.published}>
+			</RedditStylePreview>)
 		}<!--Turns out you need to spread the array because of serialization reasons?-->
 	</main>
 </HomeLayout>
