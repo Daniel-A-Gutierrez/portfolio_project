@@ -16,7 +16,7 @@ const {frontmatter} = Astro.props; //frontmatter = astro.props.frontmatter
 const dbg = JSON.stringify(frontmatter);
 ---
 <Layout title = {frontmatter.title}>
-	<article>
+	<article class="container">
 		<div class='topbar'>
 			<div><a class='homelink' href="/">←</a></div>
 			<h4>{frontmatter.published}</h4>

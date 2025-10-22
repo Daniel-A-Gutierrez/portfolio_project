@@ -9,33 +9,44 @@ interface Props
 }
 const {title, description, preview, url, date} = Astro.props;
 ---
-<article>
-        <div class="textholder">
-            <a href={url}><h2>{title}</h2></a>
+<article class="row">
+        <div class="last-xs row-xs first-sm col-sm-8">
+            <a href={url}><h2 class="limitoverflow">{title}</h2></a>
             <div class='date'>
                 Date: {date}
                 <!-- Tags:{tags.map( (tag) => <a class='tag'> &nbsp;{tag}&nbsp; </a> )} -->
             </div>
             <br>
-            <p>{description}</p>
+            <p class="limitoverflow">{description}</p>
             <a href={url}><p><u>Read →</u></p></a>
         </div>
-        <a href={url}>
-            <div class='previewholder'>
+        <div class="row-xs center-xs col-sm-4 end-sm previewholder">
+            <a href={url} class="col-xs previewholder" >
                 <img src={preview} alt = 'preview image'>
-            </div>
-        </a>
+            </a>
+        </div>
 </article>
+<div class="br"></div>
 
 <style>
 
     .previewholder
     {
         width:100%;
-        height:90%;
-        display:flex;
-        flex-direction: column;
-        align-items: center;
+        height:250px;
+        padding: 0px;
+    }
+    .br 
+    {
+        border-bottom: 1px solid grey;
+    }
+    .limitoverflow
+    {
+        text-overflow: ellipsis;
+        display: -webkit-box;
+        -webkit-line-clamp: 2;
+        -webkit-box-orient: vertical;
+        overflow:hidden;
     }
     h2
     {
@@ -43,72 +54,25 @@ const {title, description, preview, url, date} = Astro.props;
         margin-top:0px;
         /* padding-top:20px; */
         margin-bottom: 0px;
-        text-overflow: ellipsis;
-        display: -webkit-box;
-        -webkit-line-clamp: 2;
-        -webkit-box-orient: vertical;
-        overflow:hidden;
         color: var(--headertxt);
     }
     p
     {  
-        overflow: hidden;
-        text-overflow: ellipsis;
         margin-top: 0px;
-        display: -webkit-box;
-        -webkit-line-clamp: 2;
-        -webkit-box-orient: vertical;
         font-size : 1.25em;
     }
     img
     {
-        left:-1px;
-        object-fit:cover;
+        object-fit: cover;
         width:100%;
         height:100%;
         border-radius: 6px;
     }
     article
     {
-        margin-left: auto;
-        margin-right: auto;
-        border-bottom: 1px solid grey;
-        display:grid;
-        grid-template-rows:.8fr .2fr;
-        margin-top: 25px;
+        margin: 25px auto 25px auto;
+        height: 520px;
     }
-    article > a 
-    {
-        grid-row:1;
-    }   
-    article > div 
-    {
-        grid-row:2;
-    }
-
-    @media (min-width : 750px)
-	{
-        article
-        {
-            display:grid;
-            grid-template-columns: .8fr .2fr;
-            grid-template-rows: 1fr;
-        }
-        article > a 
-        {
-            grid-row:1;
-        }   
-        article > div 
-        {
-            grid-row:1;
-        }
-        .textholder
-        {
-            margin-left: .25em;
-            width:90%;
-        }
-	}
-
     a
     {
         color:inherit;
@@ -117,4 +81,18 @@ const {title, description, preview, url, date} = Astro.props;
         display:inline-block;
         box-sizing: border-box;
     }
+
+    @media (min-width : 750px)
+	{
+        article 
+        {
+            height : 250px;
+        }
+        .previewholder
+        {
+            width:250px;
+            height:250px;
+        }
+	}
+
 </style> 

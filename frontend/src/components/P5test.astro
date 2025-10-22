@@ -9,7 +9,7 @@ const {width, height} = Astro.props;
 ---
 
 <div id='p5test'>
-{width},{height}
+    {width},{height}
 </div>
 
 <style >
@@ -20,24 +20,30 @@ const {width, height} = Astro.props;
     }
 </style>
 
+
+
 <script>
+    //@ts-ignore
+    import P5 from "https://cdnjs.cloudflare.com/ajax/libs/p5.js/2.0.5/p5.esm.min.js";
+    window.p5 = P5;
+    import type p5 from "p5";
     let mydiv = document.getElementById('p5test');
-        
-    import P5 from "p5"; //p5's fault.
-        
+    //import P5 from 'p5';
+    //"p5" //p5's fault. jk had to install @types/p5
+    
     function drawP5Test ()
     {
         let mydiv = document.getElementById('p5test');
         //console.log('no p5 component on this page - this is a bug in astro where it runs scripts of markdown that it only imported, but didnt display');
-        if(!mydiv){ return;}
-
+        if(!mydiv){ console.log("No div for p5 to draw into!"); return;}
+        let p5 = window.p5;
         
         const [w,h] = mydiv.innerText.split(',').map( (s)=>parseInt(s) ) ;
         mydiv.innerText="";
-        const sketch = (s :P5) => 
+        const sketch = (s : typeof p5) => 
         {
             var d2r ; 
-            let scale = 6;
+            let sketchScale = 6;
             var remap : (arg0: number)=>number;
             var demap : (arg0: number)=>number;
             type v2 = {x:number, y:number};
@@ -53,8 +59,8 @@ const {width, height} = Astro.props;
                 s.strokeWeight(2);
                 s.fill(0,0,0,0);
                 d2r = 2*s.PI/360;
-                remap = (a : number) => s.map(a,-scale,scale,0,s.width); //from scale space to screen space 
-                demap = (a : number) => s.map(a,0,s.width,-scale,scale); //from screen space to scale space
+                remap = (a : number) => s.map(a,-sketchScale,sketchScale,0,s.width); //from sketchScale space to screen space 
+                demap = (a : number) => s.map(a,0,s.width,-sketchScale,sketchScale); //from screen space to sketchScale space
             }
 
 
@@ -85,10 +91,10 @@ const {width, height} = Astro.props;
             }
 
             //let z be a vector with length one and c be an arbitrary vector which we will repeatedly add. 
-            function complexSeries(z: P5.Vector,c : v2)
+            function complexSeries(z: p5.Vector,c : v2)
             { 
                 //text following '//' are comments
-                scale = 1.5; 
+                sketchScale = 1.5; 
                 s.background(0); //try changing this to 0 or 255
                 let zmag = z.mag() ;
                 let inv = 1/zmag;
@@ -113,10 +119,12 @@ const {width, height} = Astro.props;
                 }
             }
         }
-
-        const sketchInstance = new P5( sketch, mydiv ); //their function is incorrectly typed
+        //@ts-ignore
+        const sketchInstance : p5 = new p5( sketch, mydiv ); //their function is incorrectly typed
         //use noloop and loop to stop and start the simulation
     }
+    console.log("drawing p5 test");
+    drawP5Test();
     window.addEventListener('flamethrower:router:end' , drawP5Test);
-    window.addEventListener('DOMContentLoaded', drawP5Test);
+
 </script> 

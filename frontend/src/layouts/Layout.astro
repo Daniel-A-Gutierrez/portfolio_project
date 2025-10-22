@@ -14,7 +14,10 @@ const { title } = Astro.props;
 		<link rel="icon" type="image/svg+xml" href="/favicon.svg" />
 		<meta name="generator" content={Astro.generator} />
 		<title>{title}</title>
-		 <ClientRouter  fallback="none"/>
+		 <!-- <ClientRouter  fallback="none"/> -->
+		 <script>import flamethrower from 'flamethrower-router';
+			flamethrower({ prefetch: 'visible', log: true, pageTransitions: false });
+		 </script>
 	</head>
 	<body transition:animate='none'>
 		<slot />
@@ -23,6 +26,14 @@ const { title } = Astro.props;
 </html>
 
 <style lang="scss" is:global>
+	//reconfig to match pico 
+	// $flexboxgrid-breakpoints: (
+	// 	sm 36rem 37rem,
+	// 	md 48rem 49rem,
+	// 	lg 64rem 65rem,
+	// 	xlg 80rem 81rem,
+	// 	xxl 96rem 97rem )	;
+	@use "flexboxgrid-sass/flexboxgrid" ;
 
 	//holy shit finally found the proper way. 
 	@use "@picocss/pico/scss/pico" with 
@@ -35,15 +46,51 @@ const { title } = Astro.props;
 			lg: (root-font-size: 95%, viewport : 80%),
 			xl: (root-font-size: 100%, viewport: 75%),
 			xxl: (root-font-size: 105%, viewport : 66%)
-  		),);
-	//reconfig to match pico 
-	$flexboxgrid-breakpoints: (
-		sm 36rem 37rem,
-		md 48rem 49rem,
-		lg 64rem 65rem,
-		xlg 80rem 81rem,
-		xxl 96rem 97rem )	;
-	@use "flexboxgrid-sass/flexboxgrid.scss" ;
+  		),
+		$modules: (
+			"themes/default": false,
+			// Layout
+			"layout/document": true,
+			"layout/landmarks":false,
+			"layout/container":true,
+			"layout/section": false,
+			"layout/grid": false,
+			"layout/overflow-auto": true,
+
+			// Content
+			"content/link": true,
+			"content/typography": true,
+			"content/embedded": true,
+			"content/button": true,
+			"content/table": true,
+			"content/code": true,
+			"content/figure": false,
+			"content/misc": true,
+
+			// Forms
+			"forms/basics": true,
+			"forms/checkbox-radio-switch": true,
+			"forms/input-color": false,
+			"forms/input-date": false,
+			"forms/input-file": false,
+			"forms/input-range": false,
+			"forms/input-search": true,
+
+			//components
+			"components/accordion": false,
+			"components/card": false,
+			"components/dropdown": false,
+			"components/loading": false,
+			"components/modal": false,
+			"components/nav": false,
+			"components/progress": false,
+			"components/tooltip": false,
+
+			//utilities
+			"utilities/accessibility": false,
+			"utilities/reduce-motion": false
+		));
+	
 </style>
 
 <style is:global>
@@ -83,4 +130,9 @@ const { title } = Astro.props;
 		min-height: 100vh;
 		font-family: system-ui, 'Open Sans', 'Helvetica Neue', sans-serif;
 	}
+
+	body{
+		margin: 0px,
+	}
+
 </style>
