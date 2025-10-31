@@ -23,7 +23,7 @@ let frontmatter : HomePageFrontmatter | undefined = props?.frontmatter;
     <slot  name='link2'>{ frontmatter ? <a href = {frontmatter.leftlink} > {frontmatter.lefttext} </a> : <a>placeholder2</a>}</slot>
     <a class= 'pfp-placeholder' href=""></a>
     <slot  name='link3'>{ frontmatter ? <a href = {frontmatter.rightlink} > {frontmatter.righttext} </a> : <a>placeholder3</a>}</slot> 
-    <a href="/spring 25 resume.pdf" target="_blank" download>Resume</a>
+    <a href="/spring 25 resume.pdf" target="_blank" data-cold download>Resume</a>
 </div>
 <div class={frontmatter?'mdcontainer':''}> <slot></slot> </div>
 </Layout>
@@ -58,7 +58,7 @@ let frontmatter : HomePageFrontmatter | undefined = props?.frontmatter;
     .banner
     {
         height: min(50vh, 400px);
-        background : url('/images/night sky v5.png'); 
+        background : url('images/night sky v5.png'); 
         background-size: cover;
         background-position-y: 20%;
     }
@@ -69,7 +69,7 @@ let frontmatter : HomePageFrontmatter | undefined = props?.frontmatter;
         height: var(--picsize);
         margin: calc(-1 * var(--picsize)/2) auto;
         border-radius: 50px;
-        background-image: url('/images/me portrait.jpg');
+        background-image: url('images/me portrait.jpg');
         background-position: center;
         background-size: cover;
     }
