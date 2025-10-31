@@ -1,11 +1,21 @@
 ---
 export interface Props {
-	title : string
+	title : string,
+    frontmatter? : HomePageFrontmatter
 }
+type HomePageFrontmatter = {
+    title: string
+    layout: string
+    leftlink : string
+    lefttext : string
+    rightlink : string
+    righttext : string
+};
 import Layout from './Layout.astro';
-const frontmatter = Astro.props.frontmatter; //frontmatter = astro.props.frontmatter
+const props : Props = Astro.props; //frontmatter = astro.props.frontmatter
+let frontmatter : HomePageFrontmatter | undefined = props?.frontmatter;
 ---
-<Layout title={Astro.props.title}>
+<Layout title={props.title}>
 <div class="banner"></div>
 <div class="pfp"></div>
 <div class="navigator">
@@ -13,7 +23,7 @@ const frontmatter = Astro.props.frontmatter; //frontmatter = astro.props.frontma
     <slot  name='link2'>{ frontmatter ? <a href = {frontmatter.leftlink} > {frontmatter.lefttext} </a> : <a>placeholder2</a>}</slot>
     <a class= 'pfp-placeholder' href=""></a>
     <slot  name='link3'>{ frontmatter ? <a href = {frontmatter.rightlink} > {frontmatter.righttext} </a> : <a>placeholder3</a>}</slot> 
-    <a href="/resume.txt" target='_blank'>Resume</a>
+    <a href="/spring 25 resume.pdf" target="_blank" download>Resume</a>
 </div>
 <div class={frontmatter?'mdcontainer':''}> <slot></slot> </div>
 </Layout>
@@ -48,7 +58,7 @@ const frontmatter = Astro.props.frontmatter; //frontmatter = astro.props.frontma
     .banner
     {
         height: min(50vh, 400px);
-        background : url('/images/night%20sky%20v5.png'); 
+        background : url('/images/night sky v5.png'); 
         background-size: cover;
         background-position-y: 20%;
     }
@@ -59,9 +69,9 @@ const frontmatter = Astro.props.frontmatter; //frontmatter = astro.props.frontma
         height: var(--picsize);
         margin: calc(-1 * var(--picsize)/2) auto;
         border-radius: 50px;
-        background-image: url('/images/me%20portrait.webp');
+        background-image: url('/images/me portrait.jpg');
         background-position: center;
-        background-size: contain;
+        background-size: cover;
     }
     .navigator
         {

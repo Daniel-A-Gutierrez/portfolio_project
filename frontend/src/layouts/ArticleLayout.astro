@@ -12,18 +12,19 @@ type Props = MarkdownLayoutProps< {
 	tags : undefined | string[]
 	draft : undefined | boolean
 }>;
+
 const {frontmatter} = Astro.props; //frontmatter = astro.props.frontmatter
 const dbg = JSON.stringify(frontmatter);
 ---
 <Layout title = {frontmatter.title}>
-	<article class="container">
+	<article>
 		<div class='topbar'>
 			<div><a class='homelink' href="/">←</a></div>
 			<h4>{frontmatter.published}</h4>
 		</div>
 		<h1>{frontmatter.title}</h1>
 		<slot></slot>
-		{frontmatter.tags && <footer>Tags : {frontmatter.tags?.map( (x:string) => <a>{x}&nbsp;</a> )}</footer>}
+		{frontmatter.tags && <footer>Tags : {frontmatter.tags.map( (x:string) => <a>{x}&nbsp;</a> )}</footer>}
 	</article>
 
 
@@ -37,21 +38,26 @@ const dbg = JSON.stringify(frontmatter);
 			font-size: var(--psize);
 			line-height : 1.65em;
 		}
-		a:visited, a
+		/* a:visited, a
 		{
 			color:inherit;
 		}
 		a:hover
 		{
 			color: var(--secondtext);
-		}
+		} */
 	</style>
+
 </Layout>
+
 <style>
 	article
 	{
-		margin:auto;
+		width: 95%;
+		max-width: var(--article-max-width);
+		margin: auto;
 	}
+
 	.topbar
 	{
 		display:flex;

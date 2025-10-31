@@ -1,14 +1,15 @@
 ---
 title : "The Fastest Stack"
 description : "A tour of the web technology I use to make this site as fast as possible."
-preview : "/images/previews/fireship.png"
+preview : "/previews/fireship.png"
 postnum : 4
-layout : '../layouts/PicoArticleLayout.astro'
+layout : '../layouts/ArticleLayout.astro'
 published : '11/10/2022'
 tags : ['Astro', 'Flamethrower', 'Performance']
 draft : false
 ---
-import Image from '../components/Image.astro';
+import ArticleImage from '../components/ArticleImage.astro';
+import AF from '/src/images/astroflamethrower.png';
 
 Here's a list of things your computer can do in under 16.67ms : 
 - [Procedurally generate this mine cart animation](https://www.shadertoy.com/view/Ms2fWW)
@@ -21,8 +22,8 @@ In the year 2022 theres no reason why a simple webpage should take much longer t
 hardware with a good connection.
 
 The technologies I use in this website to achieve that are :  
-
-<Image src='../../images/astroflamethrower.png' maxwidth='400px'></Image>
+spitting.alpacacdn.com
+<ArticleImage src={AF} width='400px' alt="flamethrower and astro logos"></ArticleImage>
 
 1. Astro - a super lightweight framework that prerenders everything at build time and boasts intercompatibility with every other major framework.
 2. Flamethrower - a client side router that pre fetches visible links and intercepts page transitions to convert a multi page app to a single page one. 

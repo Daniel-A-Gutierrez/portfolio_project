@@ -1,0 +1,47 @@
+---
+export interface Props 
+{
+    filename : string,
+    language : string
+}
+let props = Astro.props;
+---
+
+<div>
+    <code class="snippet">
+        <h3>{props.filename}</h3>
+        <slot/>
+    </code>
+</div>
+
+<style>
+    div 
+    {
+        border-radius: 8px;
+        background-color: var(--mainbkg);
+    }
+
+    h3 
+    {
+        border-top-left-radius: 4px;
+        border-top-right-radius: 4px;
+        padding:2.5px;
+        border: 1px solid var(--mainbkg);
+        border-bottom: 2px solid grey;
+        background-color: var(--secondbkg);
+    }
+
+    code 
+    {
+        font-size:112.5%;
+    }
+</style>
+
+<style is:global>
+    code.snippet > pre
+    {
+        border-radius: 8px;
+        background-color: var(--mainbkg) !important;
+        padding-bottom: 8px;
+    }
+</style>

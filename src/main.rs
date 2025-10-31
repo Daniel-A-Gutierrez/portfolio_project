@@ -1,74 +1,68 @@
-use std::net::SocketAddr;
-use axum::{self,routing::{get,post}};
+use anyhow::{ensure, Result};
+use axum::{self, debug_handler,
+           extract::State,
+           response::IntoResponse,
+           routing::{get, post, put},
+           Json};
+use lib::*;
+use rusqlite::{self, Connection, OptionalExtension};
+use serde::Deserialize;
+use std::{net::SocketAddr, sync::Arc};
+use tokio::{self, sync::Mutex};
 use tower_http;
-use tokio;
 use tower_http::services::ServeDir;
-use anyhow::{Result, ensure};
-use rusqlite::{Connection, self, OptionalExtension};
+type AppState = Arc<Mutex<rusqlite::Connection>>;
 
 #[cfg(debug_assertions)]
-const BIND : [u8;4] = [127,0,0,1];
+const BIND: [u8; 4] = [127, 0, 0, 1];
 #[cfg(debug_assertions)]
-const PORT : u16 = 3334;
+const PORT: u16 = 3334;
 // release build will be out-facing
 #[cfg(not(debug_assertions))]
-const BIND : [u8;4] = [0,0,0,0];
+const BIND: [u8; 4] = [0, 0, 0, 0];
 #[cfg(not(debug_assertions))]
-const PORT : u16 = 80; // or 443 for https if we cert up
-
+const PORT: u16 = 80; // or 443 for https if we cert up
 
 #[tokio::main]
-async fn main() 
+async fn main()
 {
     let addr = SocketAddr::from((BIND, PORT)); //0.0.0.0 for outfacing
-    let page_router = axum::Router::new()
-        .route("/hello", get( || async {"hello"}) )
-        .nest_service("/",ServeDir::new("frontend/dist"))
-        .into_make_service();
+    let db = init_db().expect("Couldn't connect to database");
+    let state = Arc::new(Mutex::new(db));
+    let api_router = axum::Router::new().route("/kv_set", put(kv_set))
+                                        .route("/kv_get", post(kv_get))
+                                        .with_state(state);
+    let page_router = axum::Router::new().route("/hello", get(|| async { "hello" }))
+                                         .nest_service("/api", api_router)
+                                         .nest_service("/", ServeDir::new("frontend/dist"))
+                                         .into_make_service();
     let _server = hyper::Server::bind(&addr).serve(page_router).await.unwrap();
 }
-
-async fn init_db() -> Result<Connection>
+#[derive(Deserialize)]
+struct KVSetRequest
 {
-    let conn = Connection::open_in_memory()?;
-    conn.execute("CREATE TABLE IF NOT EXISTS storage (id : INTEGER PRIMARY KEY AUTOINCREMENT, 
-                    keys : UNIQUE TEXT, values : TEXT);
-                  CREATE UNIQUE INDEX IF NOT EXISTS idx_storage_keys ON storage (keys); ", ())?;
-    return Ok(conn);
+    key:   String,
+    value: String,
 }
 
-async fn db_truncate(conn : &Connection, to : usize) -> Result<()>
+#[debug_handler]
+async fn kv_set(state: State<AppState>, req: Json<KVSetRequest>) -> Result<impl IntoResponse, String>
 {
-    conn.execute("DELETE FROM storage WHERE id > $1;", (to,))?;
+    let cnxn = state.lock().await;
+    db_set(&cnxn, &req.key, &req.value).map_err(|e| e.to_string())?;
     return Ok(());
 }
 
-async fn db_delete(conn : &Connection, key : &str) -> Result<()>
+#[derive(Deserialize)]
+struct KVGetRequest
 {
-    conn.execute("DELETE FROM storage WHERE key = $1;", (key,))?;
-    return Ok(());
+    key: String,
 }
 
-enum InsertError { Oversized, KeyAlreadyPresent, DBError(rusqlite::Error) }
-
-async fn db_insert<T>(conn : &Connection, key : &str, val : &str) -> Result<() , InsertError>
+#[debug_handler]
+async fn kv_get(state: State<AppState>, req: Json<KVGetRequest>) -> Result<impl IntoResponse, String>
 {
-    if key.len() > 10_000 || val.len() > 10_000 { return Err(InsertError::Oversized) };
-
-    conn.execute("INSERT INTO storage ($1,$2);", (key, val)).map_err(
-        |e| {
-            match e.sqlite_error_code() {
-                Some(rusqlite::ErrorCode::ConstraintViolation) => InsertError::KeyAlreadyPresent, 
-                _ => InsertError::DBError(e),
-            }
-        })?;
+    let cnxn = state.lock().await;
+    db_get(&cnxn, &req.key).map_err(|e| e.to_string())?;
     return Ok(());
-}
-
-async fn db_get(conn : &Connection, key : &str) -> Result<Option<(usize, String)>, rusqlite::Error>
-{
-    return conn.query_one("SELECT id,value FROM storage WHERE key = $1;" , (key,) , 
-        |row| Ok(Some((row.get(0).expect("Storage table has incorrect columns"), 
-                  row.get(2).expect("Storage table has incorrect columns")))));
-            
 }

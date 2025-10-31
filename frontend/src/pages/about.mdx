@@ -10,13 +10,14 @@ righttext : 'Contact'
 [comment]: <> (//named imports import a specific thing exported by the module with the same name)
 [comment]: <> (last comment - my image implementation is better. going back to it )
 
-import Image from '../components/Image.astro'; 
+import ArticleImage from '/src/components/ArticleImage.astro'; 
+import MeAtPier from '/src/images/me at pier.jpeg';
 
 # About
 ---
 
 
-<Image src='/images/me%20at%20pier.jpeg' alt='me at a pier' maxwidth='400px'></Image>
+<ArticleImage src={MeAtPier} alt='me at a pier' width='400px'/>
 
 My name is Daniel Gutierrez, and this is my personal blog.  
 

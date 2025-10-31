@@ -1,30 +1,55 @@
 ---
 title : "Website Redesign!"
 description : "Upgrading the website from Astro 1.9.2 to 5.14.5 and more!"
-preview : "/images/previews/1.png"
+preview : "/previews/1.png"
 postnum : 5
 published : '10/17/2025'
-layout : '../layouts/PicoArticleLayout.astro'
+layout : '../layouts/ArticleLayout.astro'
 tags : ['c']
 ---
-import Image from '../components/Image.astro';
+import ArticleImage from '../components/ArticleImage.astro';
+import CodeSnippet from '../components/CodeSnippet.astro';
+import UnevenImagesImg from '/src/images/Redesign/UnevenImages.png';
+import UnevenWidthsImg from '/src/images/Redesign/UnevenWidths.png';
+import P5TypeErrorImg from '../images/Redesign/p5 type error.png';
 
-## Why ? 
+# Meta
+This article was written as sortof a stream-of-consciousness as I fought through the process
+of 
+- fixing css and logic bugs in my website ,
+- improving the overall aesthetic,
+- improving the performance by minimizing the amount of data I have to serve.
+
+Enjoy my struggles. Also turn your dark mode extension off if you use one please ☺️.
+
+# Why Redesign?
 
 <div style="display:flex; flex-direction:horizontal">
-    <Image src='../../images/UnevenImages.png' maxwidth='350px' alt='Uneven images on the blog page.'/>
-    <Image src='../../images/UnevenWidths.png' maxwidth='500px' alt='Uneven images on the blog page.'/>
+    <ArticleImage src={UnevenImagesImg} width='350px' alt='Uneven images on the blog page.'/>
+    <ArticleImage src={UnevenWidthsImg} width='500px' alt='Uneven images on the blog page.'/>
 </div>
-## First order of business : Importing Pico
+
+Some aspects of this site show my lack of experience when I first made it.   
+The css isn't responsive and there's strange bugs as a result.   
+I intend to overhaul it with [pico](https://picocss.com/) and [flexbox-grid](https://github.com/hugeinc/flexboxgrid-sass), 
+while attempting to minimize the size of the resulting bundle. 
+
+## First order of business : Importing Pico and Flexbox-Grid
 
 I made the initial mistake of not looking for scss specific instructions for this - 
 the documentation says to simply do 
-``` scss
-    @use "pico"
-```
+<CodeSnippet filename="src/Layouts/Layout.astro">
+	```scss
+		...
+		@use "pico"
+	```
+</CodeSnippet>
 
 Yeah its not that simple, but after lots of tinkering I've landed at the following
+<CodeSnippet filename="src/Layouts/Layout.astro">
 ``` scss
+	...
+	@use "flexboxgrid-sass/flexboxgrid";
 	@use "@picocss/pico/scss/pico" with 
 	(
 		$theme-color: "violet", 
@@ -35,8 +60,21 @@ Yeah its not that simple, but after lots of tinkering I've landed at the followi
 			lg: (root-font-size: 95%),
 			xl: (root-font-size: 100%,),
 			xxl: (root-font-size: 105%,)
-  		),);
+  		),
+		$modules: (
+			"themes/default": false,
+			// Layout
+			"layout/document": true,
+			"layout/landmarks":false,
+			"layout/container":true,)
+			... //many other modules
+		);
+
 ```
+</CodeSnippet>
+The parent selector bit doesn't seem to work, and I didn't like how it made all my text
+cartoonishly large so I overrode that in the breakpoints attribute. SCSS already paying off!
+
 Despite the specification of parent selector, which normally makes pico only affect things 
 inside of a '.pico' classed container, typography seems to be the exception to that rule, so
 overriding some variables there is necessary. 
@@ -44,49 +82,141 @@ overriding some variables there is necessary.
 I've also discovered that astro makes no guarantees about rule ordering for css so variables
 need to be overridden with ```!important```, which is kind of annoying.
 
-npm install -g sass-migrator
-sass-migrator module --migrate-deps node_modules/flexboxgrid-sass/flexboxgrid.scss
-sass-migrator division  node_modules/flexboxgrid-sass/flexboxgrid.scss
+I decided to leave layout stuff to flexbox-grid wherever possible, but after installing it
+sass kept emitting warnings about depreciation of certain aspects of it.  
+They have an automigrator though so fixing it up was easy.  
 
-### Optimization
+<CodeSnippet filename="bash">
+	``` bash
+		npm install -g sass-migrator
+		sass-migrator module --migrate-deps node_modules/flexboxgrid-sass/flexboxgrid.scss
+		sass-migrator division  node_modules/flexboxgrid-sass/flexboxgrid.scss
+	```
+</CodeSnippet>
 
-WOW DO I LOVE TYPESCRIPT
+The new RedditStylePreview looks like this
+<CodeSnippet filename="Components/RedditStylePreview.astro">
+```astro 
+	<article class="row">
+			<div class="last-xs row-xs first-sm col-sm-8">
+				<a href={url}><h2 class="limitoverflow">{title}</h2></a>
+				<div class='date'>
+					Date: {date}
+					<!-- Tags:{tags.map( (tag) => <a class='tag'> &nbsp;{tag}&nbsp; </a> )} -->
+				</div>
+				<br>
+				<p class="limitoverflow">{description}</p>
+				<a href={url}><p><u>Read →</u></p></a>
+			</div>
+			<div class="row-xs center-xs col-sm-4 end-sm previewholder">
+				<a href={url} class="col-xs previewholder" >
+					<img src={preview} alt = 'preview image'>
+				</a>
+			</div>
+	</article>
+```
+<div class="br"></div>
+</CodeSnippet>
+
+The before really didnt look any different except there was a lot more fat in the \<style> 
+blocks, and they weren't responsive. 
+
+As for what exactly is going on here, lets start with the second div child of article,
+holding the a>image. ```'row-xs center-xs'``` is telling the div that 
+from 0 - the xs breakpoint, we're a row with centered content. ```'col-sm-4 end-sm'``` tells it
+that from xs-sm or above, we're a column with width 4/12 and are to be rendered at the end of the row.
+
+For the first div, ```'"last-xs row-xs first-sm col-sm-8"'``` means that from 0-xs, we're 
+a row and we're rendered last, so at the bottom, and from sm -> inf , were a column with a width
+of 8/12 and we're rendered first, so on the left. 
+
+".previewholder" is a class that just constrains the image to the div its in, and limitoverflow 
+limits the contents to 2 lines. The most important bits of the css are below.
+
+<CodeSnippet filename="RedditStylePreview.astro">
+```css
+	<style>
+
+		.previewholder
+		{
+			width:100%;
+			height:250px;
+			padding: 0px;
+		}
+		.br 
+		{
+			border-bottom: 1px solid grey;
+		}
+		.limitoverflow
+		{
+			text-overflow: ellipsis;
+			display: -webkit-box;
+			-webkit-line-clamp: 2;
+			-webkit-box-orient: vertical;
+			overflow:hidden;
+		}
+		...
+
+		@media (min-width : 750px)
+		{
+			article 
+			{
+				height : 250px;
+			}
+			.previewholder
+			{
+				width:250px;
+				height:250px;
+			}
+		}
+
+	</style> 
+```
+</CodeSnippet>
+
+# GLOBAL PAIN
+
+WOW DO I LOVE TYPESCRIPT.  
 According to the typescript documentation [Triple-slash directives are only valid at the top of their containing file. ](https://www.typescriptlang.org/docs/handbook/triple-slash-directives.html)
 And yet, the first example works, while the second doesn't. Go figure.
 
-src/env.d.ts 
-```typescript 
-interface Window
-{
-    hi : string;
-}
-/// <reference types="astro/client" />
-```
+<CodeSnippet filename="src/env.d.ts ">
+	```typescript 
+		interface Window
+		{
+			hi : string;
+		}
+		/// <reference types="astro/client" />
+	```
+</CodeSnippet>
 
-src/env.d.ts 
-```typescript 
-/// <reference types="astro/client" />
-interface Window
-{
-    hi : string;
-}
-```
+<CodeSnippet filename="src/env.d.ts ">
+	```typescript 
+		/// <reference types="astro/client" />
+		interface Window
+		{
+			hi : string;
+		}
+	```
+</CodeSnippet>
 I swear its a tradeoff between the utterly deranged type system of javascript and the utterly deranged
 build process of endless tech stacks and configurations of typescript. 
 
 Wait nevermind, it stopped working for some reason.
 
-### GLOBAL PAIN
 Ok this has become a day long ardour. 
 I share my pain so that others may not know it. 
 All I wanted was to have types in my editor but use a CDN link for the p5 library on the
 page that uses it. 
 
-``` typescript title="env.d.ts"
-interface Window {
-	myFunction(): boolean;
-}
-```
+<CodeSnippet filename="env.d.ts">
+	``` typescript
+		interface Window {
+			myFunction(): boolean;
+		}
+	```
+</CodeSnippet>
+
 
 This should make myFunction available on the global Window object.
 The goal is to make the p5 module available here instead.
@@ -95,64 +225,78 @@ When the p5 article loads it should dynamically load the p5 library, add it to w
 which will take a div and populate it with the sketch once its loaded. 
 
 Unfortunately this doesnt work. 
-``` typescript title="env.d.ts"
-/// <reference types="astro/client" />
-import type p5 from 'p5';
-interface Window {
-    p5 : p5;
-    hi : string;
-};
-```
+<CodeSnippet filename="env.d.ts">
+	``` typescript
+		/// <reference types="astro/client" />
+		import type p5 from 'p5';
+		interface Window {
+			p5 : p5;
+			hi : string;
+		};
+	```
+</CodeSnippet>
 
-However, this DOES, but it has no idea what the p5 type actually is.
-``` typescript title="env.d.ts"
-/// <reference types="astro/client" />
-//import type p5 from 'p5';
-interface Window {
-    p5 : p5;
-    hi : string;
-};
-```
+However, this at least silences the errors and gives me some code completion, 
+but it has no idea what the p5 type actually is and assumes its <code>any</code>.
+<CodeSnippet filename="env.d.ts">
+	``` typescript 
+		/// <reference types="astro/client" />
+		//import type p5 from 'p5';
+		interface Window {
+			p5 : p5;
+			hi : string;
+		}
+	```
+</CodeSnippet>
 
-I've tried including p5 in tsconfig.jsons 'types' property, using <code>global.d.ts</code> instead,
-using <code>"///<reference types='p5'/>"</code>, using <code>Interface Window</code> in env.d.ts,  
-none of them work. 
+I've tried 
+- including p5 in tsconfig.jsons 'types' property, 
+- using <code>global.d.ts</code> instead,
+- using <code>"///<reference types='p5'/>"</code>, 
+- using <code>Interface Window</code> in env.d.ts,  
 
-It's frustrating the the first solution above actually does work within env.d.ts, but that doesn't
-extend to the rest of the project somehow. 
+but none of them work.  
+
+It's frustrating that the first solution above actually does work within env.d.ts, 
+but that type inference doesn't extend to the rest of the project somehow. 
 
 I've posted a stack overflow question [here](https://stackoverflow.com/questions/79794549/how-can-i-import-an-external-javascript-library-from-a-cdn-for-a-website-and-s) 
 in case this gets fixed in the future, the solution may be there. 
 
 ...
 
-Ok actually, its the next day and I had an idea - astro must be doing some preprocessing to env.d.ts
+Ok actually, its the next day and I had an idea - Astro must be doing some preprocessing to env.d.ts
 or something, so using global.d.ts instead and following some advice [here](https://stackoverflow.com/questions/42233987/how-to-configure-custom-global-interfaces-d-ts-files-for-typescript) 
 I managed to get types into my article component with 
 
-``` typescript title="global.d.ts"
-export {};
-import type p5 from 'p5';
-declare global 
-{
-    interface Window {
-        p5 : p5;
-    };
-}
-```
+<CodeSnippet filename="global.d.ts">
+	``` typescript 
+		export {};
+		import type p5 from 'p5';
+		declare global 
+		{
+			interface Window {
+				p5 : p5;
+			};
+		}
+	```
+</CodeSnippet>
+
 
 Now in the article I have to actually import it from a URL. 
-This would've been simpler if p5 didnt export a class, a module, a namespace, and an interface all with the same Name but still
+This would've been simpler if p5 didnt export a class, a module, a namespace, and an interface all with the same name but still.  
 Dancing around name collisions we get : 
-```typescript
-//@ts-ignore
-import P5 from "https://cdnjs.cloudflare.com/ajax/libs/p5.js/2.0.5/p5.esm.min.js";
-window.p5 = P5;
-import type p5 from "p5";
-let p5 = window.p5;
-```
+<CodeSnippet filename="global.d.ts">
+	```typescript
+		//@ts-ignore
+		import P5 from "https://cdnjs.cloudflare.com/ajax/libs/p5.js/2.0.5/p5.esm.min.js";
+		window.p5 = P5;
+		import type p5 from "p5";
+		let p5 = window.p5;
+	```
+</CodeSnippet>
 
-<Image src='../../images/UnevenWidths.png' maxwidth='500px' alt='Uneven images on the blog page.'/>
+<ArticleImage src={P5TypeErrorImg} width='500px' alt='The web console showing p5 errors.'/>
 
 Damnit. the types between the library and my code dont line up. 
 
@@ -160,22 +304,26 @@ This actually wasn't that hard to figure out though, it was my local types that 
 I just did with the p5 identifier. It wants the class, so I just have to use it as a class and ignore typescript's screaming.
 
 Before : 
-```typescript 
-	//before
-    const sketchInstance : p5 = new p5.p5( sketch, mydiv ); //their function is incorrectly typed
+<CodeSnippet filename="src/Components/P5test.astro">
+	```typescript 
 
-	//after 
-	//@ts-ignore
-	const sketchInstance : p5 = new p5( sketch, mydiv ); 
-```
+		//before
+		const sketchInstance : p5 = new p5.p5( sketch, mydiv ); //their function is incorrectly typed
+
+		//after 
+		//@ts-ignore
+		const sketchInstance : p5 = new p5( sketch, mydiv ); 
+	```
+</CodeSnippet>
+
 
 At long last! I don't have to host p5 from my little server anymore! Hooray!
 
 Man, I'm glad I have a template for doing this now but I really don't want to have to mess with this again.
 
-### Client Side Routing Pain
+# Client Side Routing Pain
 I discovered a bug in my p5 article while working on the previous endeavor where the p5 example wouldn't load if the page wasn't
-the initial page load - if you navigated there from the homepage for example, it wouldn't load the example.
+the initial page load - if you navigated there from the homepage for example, it wouldn't load the sketch.
 
 Apparently astro and flamethrower both have special properties - astro-data-rerun and data-reload - 
 that force a script to rerun after the initial load, but neither worked. 
@@ -184,17 +332,123 @@ Furthermore the astro one forces the script to be inline, meaning you cant use t
 The flamethrower documentation explicitly says that body scripts rerun on page load but
 that seems to no longer be the case.
 
-After faffing about with the p5 page for another half a day eventually I got it working by appending the 
+After faffing about with the p5 page for another couple hours eventually I got it working by appending the 
 following blurb at the end. 
 
-```typescript
-    console.log("drawing p5 test");
-    drawP5Test();
-    window.addEventListener('flamethrower:router:end' , drawP5Test);
-```
+<CodeSnippet filename="src/Components/P5test.astro">
+	```typescript
+		console.log("drawing p5 test");
+		drawP5Test();
+		window.addEventListener('flamethrower:router:end' , drawP5Test);
+	```
+</CodeSnippet>
+
 
 It turns out this is a problem for other client side routers too...  
 https://github.com/vercel/next.js/discussions/17919  
 
 It seems pages preloaded with \<link> tags no longer rerun body scripts?
 I suppose if the intent is to preserve state between page loads it sorta makes sense...
+
+## Code Snippets
+
+I've come to realize 2 things : 
+1. This article has many code snippets in it.
+2. They're all ugly (or at least they are as of writing this).
+
+For reference, this is what they looked like before I improved them.  
+This was also my first attempt at making them look better.
+```astro
+<section>
+	<code>
+		<h3>src/Layouts/Layout.astro</h3>
+		@use "pico"
+	</code>
+</section>
+```
+
+I did some research and stumbled upon [this](https://ryan-schachte.com/blog/fun_with_code_blocks/) blog.
+While those code snippets DO look quite nice, I don't want to install new dependencies 
+entirely for the purpose of linting code in the browser, when I already kindof have that.  
+At least not yet.
+
+I decided to make my own component, but the important part - linting - doesn't come for free 
+with \<code> blocks. 
+<CodeSnippet filename="src/Layouts/Layout.astro">
+	@use "pico"
+</CodeSnippet>
+
+But then I had an idea - does markdown's preprocessor work within the contents of custom 
+components? 
+<CodeSnippet filename="Nested Markdown Code">
+```astro
+	<CodeSnippet filename="src/Layouts/Layout.astro">
+		'''scss
+			@use "pico"
+		'''
+	</CodeSnippet>
+```
+</CodeSnippet>
+
+It does! I can inception the code snippets too!  
+Since we're getting meta, heres the source code of the code snippet component I've made.
+
+<CodeSnippet filename="src/Components/CodeSnippet.astro">
+```astro
+	---
+	export interface Props 
+	{
+		filename : string,
+		language : string
+	}
+	let props = Astro.props;
+	---
+
+	<div>
+		<code class="snippet">
+			<h3>{props.filename}</h3>
+			<slot/>
+		</code>
+	</div>
+
+	<style>
+		div 
+		{
+			border-radius: 8px;
+			background-color: var(--mainbkg);
+		}
+
+		h3 
+		{
+			border-top-left-radius: 4px;
+			border-top-right-radius: 4px;
+			padding:2.5px;
+			border: 1px solid var(--mainbkg);
+			border-bottom: 2px solid grey;
+			background-color: var(--secondbkg);
+		}
+	</style>
+
+	<style is:global>
+		code.snippet > pre
+		{
+			border-radius: 8px;
+			background-color: var(--mainbkg) !important;
+			padding-bottom: 8px;
+		}
+	</style>
+```
+</CodeSnippet>
+
+# Responsive Article Width
+Not sure why I ever thought I needed media queries for this, its a simple change to instead just do
+<CodeSnippet filename="ArticleLayout.astro">
+```css
+	article
+	{
+		width: 95%;
+		max-width: var(--article-max-width);
+		margin: auto;
+	}
+```
+</CodeSnippet>

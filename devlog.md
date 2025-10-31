@@ -63,3 +63,10 @@ It does work though so unfortunately I think I have to rely on it.
 
 Ok i'm going to get some air then lets make a page with pico. 
 I think i should start by seeing the unstyled markdown looks like. 
+
+## 10/24/25
+Ok i'm done optimizing for now, theres no free image cdn that im happy with.
+
+KV Store
+Rust Macros - Crabtime
+Typescript Macros 

@@ -1,0 +1,33 @@
+---
+//doesnt seem realistic
+import {Image} from 'astro:assets';
+import type { ComponentProps } from 'astro/types'; 
+import type { LocalImageProps } from 'astro:assets';
+//export interface Props extends HTMLAttributes<"img"> {} would work too;
+//export interface Props extends ComponentProps<typeof Image>; //thanks copilot
+export type Props = ComponentProps<typeof Image>; //just gonna not support remote images.
+const props = Astro.props;
+const src = props.src as ImageMetadata;
+const width = props.width;
+const height = props.height;
+
+---
+<div class='image-container'>
+    <!--  Per docs class:list appends strings/></!-->
+    <Image {...props} class:list="article-image"></Image> 
+</div>
+
+<style define:vars={{width, height}}>
+    .image-container
+    {
+        width: var(--width);
+        height: var(--height);
+        margin: 1.5em auto;
+    }
+    .article-image 
+    {
+        margin: 1.5em auto;
+        width:100%;
+        height:100%;
+    }
+</style>
