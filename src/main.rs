@@ -1,9 +1,5 @@
 use anyhow::{ensure, Result};
-use axum::{self, debug_handler,
-           extract::State,
-           response::IntoResponse,
-           routing::{get, post, put},
-           Json};
+use axum::{self, Json, debug_handler, extract::State, response::IntoResponse, routing::{delete, get, post, put}};
 use lib::*;
 use rusqlite::{self, Connection, OptionalExtension};
 use serde::Deserialize;
@@ -31,6 +27,8 @@ async fn main()
     let state = Arc::new(Mutex::new(db));
     let api_router = axum::Router::new().route("/kv_set", put(kv_set))
                                         .route("/kv_get", post(kv_get))
+                                        .route("/kv_append", post(kv_append))
+                                        .route("/kv_delete", delete(kv_delete))
                                         .with_state(state);
     let page_router = axum::Router::new().route("/hello", get(|| async { "hello" }))
                                          .nest_service("/api", api_router)
@@ -64,5 +62,20 @@ async fn kv_get(state: State<AppState>, req: Json<KVGetRequest>) -> Result<impl 
 {
     let cnxn = state.lock().await;
     db_get(&cnxn, &req.key).map_err(|e| e.to_string())?;
+    return Ok(());
+}
+
+#[debug_handler]
+async fn kv_append(state: State<AppState>, req: Json<KVSetRequest>) -> Result<impl IntoResponse, String>
+{
+    let cnxn = state.lock().await;
+    db_append(&cnxn, &req.key, &req.value).map_err(|e| e.to_string())?;
+    return Ok(());
+}
+
+async fn kv_delete(state: State<AppState>, req: Json<KVGetRequest>) -> Result<impl IntoResponse, String>
+{
+    let cnxn = state.lock().await;
+    db_delete(&cnxn, &req.key).map_err(|e| e.to_string())?;
     return Ok(());
 }

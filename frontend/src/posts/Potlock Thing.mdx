@@ -1,0 +1,148 @@
+---
+title : "Potluck Planner"
+description : "Deshittifying the internet but just for me, mostly."
+preview : "/previews/KV Store.jpg"
+postnum : 7
+layout : '../layouts/ArticleLayout.astro'
+published : '10/24/2025'
+tags : ['Databases']
+draft : false
+---
+
+import CodeSnippet from '/src/components/CodeSnippet.astro';
+import PotluckThing from '/src/components/PotluckThing.svelte';
+
+# Why
+
+Today I tried to make a potluck form for a party using a free website.  
+When I generated an invitation link, the damn thing required people to make an account 
+with their phone number and email just to say what they're bringing! Stupid. 
+
+I'll just make one myself.
+
+It'll have a party name to view, a date and time to delete the list, 
+a passphrase to add a new entry. Entries cant be edited after theyre inserted. 
+
+I'll build this off of the KV store I already put on the server so it shouldn't 
+require any backend programming, just frontend. 
+
+Actually never mind its going to require a touch of backend to update the entry and do so 
+atomically.
+
+# The Backend Stuff
+
+Just gotta add 2 new db functions
+
+<CodeSnippet filename = "lib.rs">
+    ```rust
+        #[rustfmt::ignore]
+        pub fn db_append(conn: &Connection, key: &str, val: &str) -> Result<(), DBError>
+        {
+            if val.len() > 10_000 { return Err(DBError::Oversized); }
+            let mut b4 = db_get(conn,key)?.ok_or_else(|| DBError::KeyDoesntExist)?;
+            b4.value += val;
+            if b4.key.len() + b4.value.len() > 20_000 {return Err(DBError::Oversized);}
+            conn.execute("UPDATE storage SET value = $1 WHERE key = $2;",(b4.value,b4.key)) //doesnt support limit!
+                .map_err(|e| DBError::DBError(e))?;
+            return Ok(());
+        }
+
+        pub fn db_delete(conn: &Connection, key: &str) -> Result<(), DBError>
+        {
+            if key.len() > 10_000 {return Err(DBError::Oversized);}
+            conn.query_one("SELECT * FROM storage WHERE key = $1 LIMIT 1;", (key,), |row| {
+                            Ok(KVRow::try_from(row).expect("Row did not match table schema"))
+                        })
+                        .optional()
+                        .map_err(|e| DBError::DBError(e))?
+                        .ok_or_else(|| DBError::KeyDoesntExist)?;
+            conn.execute("DELETE FROM storage WHERE key = $1;",(key,))
+                .map_err(|e| DBError::DBError(e))?;
+            return Ok(());
+        }
+    ```
+</CodeSnippet>
+
+Tests for them, of course.
+
+<CodeSnippet filename= "lib.rs::test">
+    ``` rust
+        #[test]
+        fn update_t()
+        {
+            let cnxn = init_db().unwrap();
+            //just add "#[derive(Debug)]" above SetError
+            db_set(&cnxn, "hi", "bye").unwrap();
+            db_append(&cnxn, "hi", "bye").unwrap();
+            let value = db_get(&cnxn, "hi").unwrap().unwrap().value;
+            assert_eq!("byebye", value);
+        }
+
+        #[test]
+        fn update_neg_t()
+        {
+            let cnxn = init_db().unwrap();
+            db_set(&cnxn, "hi", "bye").unwrap();
+            let e = db_append(&cnxn, "hi2", "bye");
+            assert!(e.is_err_and(|e| e == DBError::KeyDoesntExist));
+        }
+
+        #[test]
+        fn delete_t()
+        {
+            let cnxn = init_db().unwrap();
+            db_set(&cnxn, "hi", "bye").unwrap();
+            db_delete(&cnxn, "hi").unwrap();
+            let value = db_get(&cnxn, "hi").unwrap();
+            assert!(value.is_none());
+        }
+
+        #[test]
+        fn delete_neg_t()
+        {
+            let cnxn = init_db().unwrap();
+            db_set(&cnxn, "hi", "bye").unwrap();
+            let e = db_delete(&cnxn, "hii");
+            assert!(e.is_err_and(|e| e==DBError::KeyDoesntExist));
+        }
+    ```
+</CodeSnippet>
+
+Bind some handlers, reusing the old request structs (sloppy but whatever).
+
+<CodeSnippet filename="main.rs">
+    ``` rust
+        #[debug_handler]
+        async fn kv_append(state: State<AppState>, req: Json<KVSetRequest>) -> Result<impl IntoResponse, String>
+        {
+            let cnxn = state.lock().await;
+            db_append(&cnxn, &req.key, &req.value).map_err(|e| e.to_string())?;
+            return Ok(());
+        }
+
+        async fn kv_delete(state: State<AppState>, req: Json<KVGetRequest>) -> Result<impl IntoResponse, String>
+        {
+            let cnxn = state.lock().await;
+            db_delete(&cnxn, &req.key).map_err(|e| e.to_string())?;
+            return Ok(());
+        }
+    ```
+</CodeSnippet>
+
+aaand add them to the api router. Ezpz.  
+Also the reason get is a post is because URLs only support 2-8k characters and the KV store 
+supports 10k characters and also making everything json is just easier.
+
+<CodeSnippet filename="main.rs::main()">
+    ``` rust 
+        let api_router = axum::Router::new().route("/kv_set", put(kv_set))
+                                            .route("/kv_get", post(kv_get))
+                                            .route("/kv_append", post(kv_append))
+                                            .route("/kv_delete", delete(kv_delete))
+                                            .with_state(state);
+    ```
+</CodeSnippet>
+
+# Some Frontend Stuff
+
+<PotluckThing/>
