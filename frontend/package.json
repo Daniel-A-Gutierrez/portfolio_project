@@ -10,12 +10,15 @@
   },
   "dependencies": {
     "@astrojs/mdx": "^4.3.7",
+    "@astrojs/svelte": "^7.2.1",
     "@picocss/pico": "^2.1.1",
     "@types/p5": "^1.7.6",
     "astro": "^5.14.5",
     "flamethrower-router": "^0.0.0-meme.12",
     "flexboxgrid-sass": "^8.0.5",
-    "p5": "^2.0.5"
+    "p5": "^2.0.5",
+    "svelte": "^5.43.2",
+    "typescript": "^5.9.3"
   },
   "devDependencies": {
     "@playform/compress": "^0.2.0",

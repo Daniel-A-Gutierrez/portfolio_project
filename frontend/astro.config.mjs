@@ -5,11 +5,9 @@ import mdx from '@astrojs/mdx';
 
 import playformCompress from '@playform/compress';
 
+import svelte from '@astrojs/svelte';
+
 // https://astro.build/config
 export default defineConfig({
-  integrations: [mdx(), purgecss()],
-  image: {
-    domains: ["spitting.alpacacdn.com"],
-  }
+  integrations: [mdx(), purgecss(), svelte()],
 });
-

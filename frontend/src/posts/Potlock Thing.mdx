@@ -145,4 +145,17 @@ supports 10k characters and also making everything json is just easier.
 
 # Some Frontend Stuff
 
-<PotluckThing/>
+This is going to be interactive so I'd rather use svelte than Astro.  
+Adding astro extensions can be tricky if you're way out of date, which is actually what motivated
+the recent update.
+Now its as simple as 
+
+<CodeSnippet filename="console">
+    ```bash
+        yarn astro add svelte
+    ```
+</CodeSnippet>
+
+
+
+<PotluckThing client:load/>
