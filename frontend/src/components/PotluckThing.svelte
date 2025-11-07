@@ -1,37 +1,37 @@
 <div class="pico potluck-planner center">
-    {#if state == State.FindOrCreate}
+    {#if componentState == State.FindOrCreate}
         <h1><center>Potluck Planner</center></h1>
         <div> 
             <!-- svelte-ignore a11y-no-redundant-roles -->
             <fieldset role="group">
                 <input type="text" placeholder="Party Code" bind:value={searchUUID}/>
-                <button on:click={() => findParty(searchUUID)}>Find</button>
+                <button onclick={() => findParty(searchUUID)}>Find</button>
             </fieldset>
             <center class="even"> or </center>
-            <center><button on:click={createNew}>Create New</button></center>
+            <center><button onclick={createNew}>Create New</button></center>
         </div>
-    {:else if state == State.Error}
-        <button on:click={reset}>Back</button>
+    {:else if componentState == State.Error}
+        <button onclick={reset}>Back</button>
         <p class="error">Error: {error}</p>
-    {:else if state == State.CreateNew}
-        <button on:click={reset}>Back</button>
-        <form>
+    {:else if componentState == State.CreateNew}
+        <button onclick={reset}>Back</button>
+        <div>
             <h1><center>Create A Party</center></h1>
             <input type="text" placeholder="Party Name" bind:value={partyName}/>
             <input type="date" bind:value={date}/>
             <input type="time" bind:value={time} placeholder="time"/>
             <input type="text" placeholder="Location" bind:value={location}/>
-            <center><button on:click = {createParty}>Create</button></center>
-        </form>
-    {:else if state == State.PartyCreated}
+            <center><button onclick = {createParty}>Create</button></center>
+        </div>
+    {:else if componentState == State.PartyCreated}
         <center>    
             <h1>Success!</h1>
             <h2>Your party's code is below, save it!</h2>
-            <h2>{newUUID}</h2>
-            <button on:click={()=>findParty(newUUID)}>View</button>
+            <h2>{partyUUID}</h2>
+            <button onclick={()=>findParty(partyUUID)}>View</button>
         </center>
-    {:else if state == State.Party}
-        <button on:click={reset}>Back</button>
+    {:else if componentState == State.Party}
+        <button onclick={reset}>Back</button>
         <center>
             <h1>{partyName}</h1>
             <table>
@@ -52,9 +52,9 @@
                 </tbody>
             </table>
 
-            <input type="text" placeholder="Your name"/>
-            <input type="text" placeholder="What you're bringing (can't edit later!)"/>
-            <button>Commit</button>
+            <input type="text" placeholder="Your name" bind:value={yourname}/>
+            <input type="text" placeholder="What you're bringing (you can't edit this later!)" bind:value={whatyourebringing}/>
+            <button onclick={commit}>Commit</button>
             
             <center><small>{partyUUID}</small></center>
 
@@ -63,6 +63,8 @@
 </div>
 
 <script lang="ts">
+    import {KVGet,KVSet,KVAppend} from '../lib.ts';
+ 
     enum State 
     {
         FindOrCreate,
@@ -72,30 +74,117 @@
         Party
     }
 
-    let state : State = State.Party;
-    let searchUUID = "";
-    let error = "bad things!";
-    let partyName = "Fake Party";
-    let newUUID = "fake uuid";
-    let date : Date;
-    let time : any;
-    let location = "my house";
-    let partyUUID = "abcd";
-    let items : {name:string,item:string}[]= [{name: "lizbeth",item : "nachos"}];
+    type PotluckEntry  =
+    {
+        uuid : string,
+        name : string,
+        date : Date,
+        time : any,
+        location : string,
+    }
+
+    //a potluck's items always has the key "{potluck.uuid}.items"
+    type ItemsEntry = 
+    {
+        name : string,
+        item : string
+    };
+
+
+    let componentState : State = $state(State.CreateNew);
+    let searchUUID = $state("");
+    let error = $state("bad things!");
+    let partyName = $state("Fake Party");
+    let date : Date = $state(new Date());
+    let time : any = $state("");
+    let location = $state("");
+    let partyUUID = $state("");
+    let items : {name:string,item:string}[]= $state([{name: "lizbeth",item : "nachos"}]);
+    let yourname = $state("");
+    let whatyourebringing = $state("");
 
     function reset() 
     {
         searchUUID = "";
-        state = State.FindOrCreate;
+        componentState = State.FindOrCreate;
     }
 
-    function findParty(uuid : string){state = State.Party}
+    async function findParty(uuid : string)
+    {
+        let res = KVGet<PotluckEntry>(uuid);
+        let items_res = KVGet<ItemsEntry[]>(uuid + ".items");
+        let party,party_items;
+        try 
+        {
+            [party,party_items] = await Promise.all([res,items_res]);
+        }
+        catch (e) 
+        {
+            console.error(e);
+            error = "Failed to search for potluck.";
+            componentState = State.Error;
+            return;
+        }
+        if (party == null || party_items == null)
+        {
+            componentState = State.Error;
+            error = "Party not found";
+            return;
+        }
+        partyName = party.name;
+        partyUUID = party.uuid;
+        location = party.location;
+        date = party.date;
+        time = party.time;
+        items = party_items;
+        componentState = State.Party;
+    }
 
-    function createNew(){state = State.CreateNew;}
+    async function createNew()
+    {
+        componentState = State.CreateNew;
+    }
 
-    function createParty(){state = State.PartyCreated}
+    async function createParty()
+    {
+        partyUUID = crypto.randomUUID();
+        console.log(partyUUID);
+        let new_party : PotluckEntry = 
+        {
+            uuid : partyUUID,
+            name : partyName,
+            date : date,
+            time : time,
+            location : location
+        };
+        try 
+        {
+            await Promise.all([KVSet(partyUUID, new_party), KVSet(partyUUID + ".items", [])]);
+        }
+        catch (e) 
+        {
+            console.error(e); 
+            error = "Failed to create new potluck"; 
+            componentState = State.Error;
+            return;
+        }
+        componentState = State.PartyCreated;
+    }
 
-    function commit(){}
+    async function commit()
+    {
+        let entry : ItemsEntry = {name: yourname, item : whatyourebringing};
+        try {await KVAppend(partyUUID + '.items', entry );}
+        catch (e)
+        {
+            console.error(e);
+            error = "Failed to append your entry to the items list.";
+            componentState = State.Error;
+        }   
+        items = [...items, entry];
+        yourname = "";
+        whatyourebringing = "";
+    }
 
 </script>
 
@@ -112,6 +201,4 @@
 
     .even{margin-bottom:16px;}
     .error{color: red;}
-    input.no-margin{margin:0;}
-    input.left16{position:relative; padding-left:8px; right:8px; width:100%;}
 </style>

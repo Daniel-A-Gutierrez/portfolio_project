@@ -12,6 +12,8 @@ draft : false
 import CodeSnippet from '/src/components/CodeSnippet.astro';
 import PotluckThing from '/src/components/PotluckThing.svelte';
 
+<PotluckThing client:load/>
+
 # Why
 
 Today I tried to make a potluck form for a party using a free website.  
@@ -156,6 +158,299 @@ Now its as simple as
     ```
 </CodeSnippet>
 
+# The Potluck Component 
+Being a bit rusty at frontend work, I left things off here before logging off for the night.  
+This is svelte, it makes managing state, using, and binding variables from scripts into html and css rather trivial,
+which is why its my preferred frontend framework.
+
+<CodeSnippet filename="potluckthing.svelte">
+``` svelte
+    <div class="pico potluck-planner center">
+        {#if state == State.FindOrCreate}
+            <h1><center>Potluck Planner</center></h1>
+            <div> 
+                <!-- svelte-ignore a11y-no-redundant-roles -->
+                <fieldset role="group">
+                    <input type="text" placeholder="Party Code" bind:value={searchUUID}/>
+                    <button on:click={() => findParty(searchUUID)}>Find</button>
+                </fieldset>
+                <center class="even"> or </center>
+                <center><button on:click={createNew}>Create New</button></center>
+            </div>
+        {:else if state == State.Error}
+            <button on:click={reset}>Back</button>
+            <p class="error">Error: {error}</p>
+        {:else if state == State.CreateNew}
+            <button on:click={reset}>Back</button>
+            <form>
+                <h1><center>Create A Party</center></h1>
+                <input type="text" placeholder="Party Name" bind:value={partyName}/>
+                <input type="date" bind:value={date}/>
+                <input type="time" bind:value={time} placeholder="time"/>
+                <input type="text" placeholder="Location" bind:value={location}/>
+                <center><button on:click = {createParty}>Create</button></center>
+            </form>
+        {:else if state == State.PartyCreated}
+            <center>    
+                <h1>Success!</h1>
+                <h2>Your party's code is below, save it!</h2>
+                <h2>{newUUID}</h2>
+                <button on:click={()=>findParty(newUUID)}>View</button>
+            </center>
+        {:else if state == State.Party}
+            <button on:click={reset}>Back</button>
+            <center>
+                <h1>{partyName}</h1>
+                <table>
+                    <thead>
+                        <tr>
+                            <td>Participant</td>
+                            <td>Food Item</td>
+                        </tr>   
+                    </thead>
+                    <tbody>
+                        {#each items as item}
+                            <tr>
+                                <td>{item.name}</td>
+                                <td>{item.item}</td>
+                            </tr>
+                        {/each}
+                        
+                    </tbody>
+                </table>
+
+                <input type="text" placeholder="Your name"/>
+                <input type="text" placeholder="What you're bringing (can't edit later!)"/>
+                <button>Commit</button>
+                
+                <center><small>{partyUUID}</small></center>
+
+            </center>
+        {/if}
+    </div>
+
+    <script lang="ts">
+        import { string } from 'astro:schema';
+
+        import type { KVRow } from "../lib.ts";
+        import {HTTPMethod, fetchJson} from '../lib.ts';
+    
+        enum State 
+        {
+            FindOrCreate,
+            Error,
+            CreateNew,
+            PartyCreated,
+            Party
+        }
 
 
-<PotluckThing client:load/>
+        let state : State = State.Party;
+        let searchUUID = "";
+        let error = "bad things!";
+        let partyName = "Fake Party";
+        let newUUID = "fake uuid";
+        let date : Date;
+        let time : any;
+        let location = "my house";
+        let partyUUID = "abcd";
+        let items : {name:string,item:string}[]= [{name: "lizbeth",item : "nachos"}];
+
+        function reset() 
+        {
+            searchUUID = "";
+            state = State.FindOrCreate;
+        }
+
+        async function findParty(uuid : string)
+        {
+            let res : KVRow | null = await fetchJson("api/kv_get", HTTPMethod.POST, {key : uuid});
+
+            //fetch("/api/kv_get", 
+            state = State.Party;
+
+        }
+
+        function createNew(){state = State.CreateNew;}
+
+        function createParty(){state = State.PartyCreated}
+
+        function commit(){}
+
+    </script>
+
+    <style>
+        .potluck-planner
+        {
+            max-width: 576px;
+            margin: 0 auto 0 auto;
+            padding:1rem;
+            box-sizing: border-box;
+            border-radius: 1rem;
+            border: 1.5px solid gray;
+        }
+
+        .even{margin-bottom:16px;}
+        .error{color: red;}
+    </style>
+```
+</CodeSnippet>
+
+# Day 2 
+I've made a mistake! My KV store doesn't differentiate between raw string values and json, so append won't work 
+for json data. 
+
+I need a kv_json_append function. I also need to change the structure of the 'potluck' data since 'items' now 
+needs to be a separate 'table', as it needs to be iterable. 
+
+```
+    cargo add serde_json
+```
+
+<CodeSnippet filename="lib.rs::db_json_append">
+    ```rust 
+        //pub fn db_append... becomes
+        pub fn db_str_append(conn: &Connection, key: &str, val: &str) -> Result<(), DBError>
+
+        #[rustfmt::ignore]
+        pub fn db_json_append(conn: &Connection, key: &str, val: &str) -> Result<(), DBError>
+        {
+            if val.len() > 10_000 { return Err(DBError::Oversized); }
+            //val should be valid json
+            let val_obj = serde_json::from_str(val).map_err(|e| DBError::Any("Deserialization Error: ".to_string() + &e.to_string()))?;
+
+            let b4 = db_get(conn,key)?.ok_or_else(|| DBError::KeyDoesntExist)?;
+            //limit size of entry
+            if b4.key.len() + b4.value.len() + val.len() > 20_000 {return Err(DBError::Oversized);}
+
+            let mut raw_v : Value = serde_json::from_str(&b4.value).map_err(|e| DBError::Any(e.to_string()))?;
+            //expect the existing value to be an iterable, error otherwise.
+            if let Value::Array(ref mut inner) = &mut raw_v 
+            {
+                inner.push(val_obj);
+            } 
+            else {return Err(DBError::NotIterable);}
+            let ser = serde_json::to_string(&raw_v).expect("Failed to serialize json after appending");
+            conn.execute("UPDATE storage SET value = $1 WHERE key = $2;",(ser,b4.key)) //doesnt support limit!
+                .map_err(|e| DBError::DBError(e))?;
+            return Ok(());
+        }
+
+        ...
+        //mod test
+        #[test]
+        fn json_append_t()
+        {
+            let cnxn = init_db().unwrap();
+            db_set(&cnxn, "hi", "[\"bye\"]").unwrap();
+            db_json_append(&cnxn, "hi", "\"bye\"").unwrap();
+            let value = db_get(&cnxn, "hi").unwrap().unwrap().value;
+            assert!(value == "[\"bye\",\"bye\"]");
+        }
+
+        #[test]
+        fn json_append_neg_t()
+        {
+            let cnxn = init_db().unwrap();
+            db_set(&cnxn, "hi", "\"bye\"").unwrap();
+            let e = db_json_append(&cnxn, "hi", "\"bye\"");
+            assert!(e.is_err_and(|e| e==DBError::NotIterable));
+        }
+
+        //a lazy update to our error handling
+        #[derive(Debug, PartialEq)]
+        pub enum DBError
+        {
+            Oversized,
+            KeyAlreadyPresent,
+            DBError(rusqlite::Error),
+            Any(String),
+            KeyDoesntExist,
+            NotIterable
+        }
+
+        impl Display for DBError
+        {
+            fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result
+            {
+                match self
+                {
+                    Self::Oversized => write!(f, "Error: Oversized Key Or Value"),
+                    Self::KeyAlreadyPresent => write!(f, "Error: Key Already Present"),
+                    Self::KeyDoesntExist => write!(f, "Error: Key Does Not Exist"),
+                    Self::NotIterable => write!(f, "Error: Expected an iterable value"),
+                    Self::DBError(e) =>
+                    {
+                        println!("{:?}", e);
+                        write!(f, "Internal Server Error")
+                    },
+                    Self::Any(e) =>
+                    {
+                        println!("{:?}", e);
+                        write!(f, "Internal Server Error")
+                    },
+                }
+            }
+        }
+
+        //main.rs::kv_append becomes
+        #[debug_handler]
+        async fn kv_json_append(state: State<AppState>, req: Json<KVSetRequest>) -> Result<impl IntoResponse, String>
+        {
+            let cnxn = state.lock().await;
+            db_json_append(&cnxn, &req.key, &req.value).map_err(|e| e.to_string())?;
+            return Ok(());
+        }
+
+
+    ```
+</CodeSnippet>
+
+Also rereading some stuff I've made a silly mistake that you probably noticed in my last post.
+
+``` rust 
+//Doesnt return anything! 
+#[debug_handler]
+async fn kv_get(state: State<AppState>, req: Json<KVGetRequest>) -> Result<impl IntoResponse, String>
+{
+    let cnxn = state.lock().await;
+    db_get(&cnxn, &req.key).map_err(|e| e.to_string())?;
+    return Ok(());
+}
+// Should be : 
+#[debug_handler]
+async fn kv_get(state: State<AppState>, req: Json<KVGetRequest>) -> Result<impl IntoResponse, String>
+{
+    let cnxn = state.lock().await;
+    let entry = db_get(&cnxn, &req.key).map_err(|e| e.to_string())?;
+    return Ok(Json(entry));
+}
+
+//which requires marking KVRow with #derive[Serde::Serialize]
+```
+
+# Debugging
+
+Some silliness trying to talk to the wrong server then discovering a wrong base url for kv_get, which should have been 
+/api/kv_get not api/kv_get. 
+
+KV_SET returned a 422 status code - a first for me. inspecting the network tab it seems the issue is that value is expected
+to be a string, not json. 
+The raw request from the browser is : 
+<CodeSnippet filename = "the request">
+    ``` json 
+        {"key":"ab65c54a-6835-4313-ad86-55e4103739dc","value":{"uuid":"ab65c54a-6835-4313-ad86-55e4103739dc","name":"Fake Party","date":"2002-12-12","time":"12:12","location":"here"}}
+    ```
+</CodeSnippet>
+
+Easy fix, in KVSet \{key,value\} needs to be \{key, value : JSON.stringify(value)\}; 
+
+Also, 
+- fetch json needed a sibling function that doesnt expect to return anything, 
+- Commit needed to actually be bound to the button, 
+- Everything needed to use svelte's new $state(value) rune, 
+- And some other little mistakes.
+
+But yeah! Potlucks!
+
+

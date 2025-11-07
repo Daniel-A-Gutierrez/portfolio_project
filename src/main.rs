@@ -27,7 +27,7 @@ async fn main()
     let state = Arc::new(Mutex::new(db));
     let api_router = axum::Router::new().route("/kv_set", put(kv_set))
                                         .route("/kv_get", post(kv_get))
-                                        .route("/kv_append", post(kv_append))
+                                        .route("/kv_json_append", post(kv_json_append))
                                         .route("/kv_delete", delete(kv_delete))
                                         .with_state(state);
     let page_router = axum::Router::new().route("/hello", get(|| async { "hello" }))
@@ -61,15 +61,15 @@ struct KVGetRequest
 async fn kv_get(state: State<AppState>, req: Json<KVGetRequest>) -> Result<impl IntoResponse, String>
 {
     let cnxn = state.lock().await;
-    db_get(&cnxn, &req.key).map_err(|e| e.to_string())?;
-    return Ok(());
+    let entry = db_get(&cnxn, &req.key).map_err(|e| e.to_string())?;
+    return Ok(Json(entry));
 }
 
 #[debug_handler]
-async fn kv_append(state: State<AppState>, req: Json<KVSetRequest>) -> Result<impl IntoResponse, String>
+async fn kv_json_append(state: State<AppState>, req: Json<KVSetRequest>) -> Result<impl IntoResponse, String>
 {
     let cnxn = state.lock().await;
-    db_append(&cnxn, &req.key, &req.value).map_err(|e| e.to_string())?;
+    db_json_append(&cnxn, &req.key, &req.value).map_err(|e| e.to_string())?;
     return Ok(());
 }
 

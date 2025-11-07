@@ -1,8 +1,10 @@
 #![feature(test)]
 use std::fmt::Display;
 
-use anyhow::{ensure, Result};
+use anyhow::{ensure, anyhow, Result};
 use rusqlite::{self, Connection, OptionalExtension, Row};
+use serde::Serialize;
+use serde_json::Value;
 
 pub fn init_db() -> Result<Connection>
 {
@@ -20,7 +22,9 @@ pub enum DBError
     Oversized,
     KeyAlreadyPresent,
     DBError(rusqlite::Error),
-    KeyDoesntExist
+    Any(String),
+    KeyDoesntExist,
+    NotIterable
 }
 
 impl Display for DBError
@@ -32,11 +36,17 @@ impl Display for DBError
             Self::Oversized => write!(f, "Error: Oversized Key Or Value"),
             Self::KeyAlreadyPresent => write!(f, "Error: Key Already Present"),
             Self::KeyDoesntExist => write!(f, "Error: Key Does Not Exist"),
+            Self::NotIterable => write!(f, "Error: Expected an iterable value"),
             Self::DBError(e) =>
             {
                 println!("{:?}", e);
                 write!(f, "Internal Server Error")
-            }
+            },
+            Self::Any(e) =>
+            {
+                println!("{:?}", e);
+                write!(f, "Internal Server Error")
+            },
         }
     }
 }
@@ -58,7 +68,7 @@ pub fn db_set(conn: &Connection, key: &str, val: &str) -> Result<(), DBError>
     return Ok(());
 }
 
-#[derive(Debug)]
+#[derive(Debug,Serialize)]
 pub struct KVRow
 {
     pub id:       i64,
@@ -98,13 +108,37 @@ pub fn db_get(conn: &Connection, key: &str) -> Result<Option<KVRow>, DBError>
 }
 
 #[rustfmt::ignore]
-pub fn db_append(conn: &Connection, key: &str, val: &str) -> Result<(), DBError>
+pub fn db_str_append(conn: &Connection, key: &str, val: &str) -> Result<(), DBError>
 {
     if val.len() > 10_000 { return Err(DBError::Oversized); }
     let mut b4 = db_get(conn,key)?.ok_or_else(|| DBError::KeyDoesntExist)?;
     b4.value += val;
     if b4.key.len() + b4.value.len() > 20_000 {return Err(DBError::Oversized);}
     conn.execute("UPDATE storage SET value = $1 WHERE key = $2;",(b4.value,b4.key)) //doesnt support limit!
+        .map_err(|e| DBError::DBError(e))?;
+    return Ok(());
+}
+
+#[rustfmt::ignore]
+pub fn db_json_append(conn: &Connection, key: &str, val: &str) -> Result<(), DBError>
+{
+    if val.len() > 10_000 { return Err(DBError::Oversized); }
+    //val should be valid json
+    let val_obj = serde_json::from_str(val).map_err(|e| DBError::Any("Deserialization Error: ".to_string() + &e.to_string()))?;
+
+    let b4 = db_get(conn,key)?.ok_or_else(|| DBError::KeyDoesntExist)?;
+    //limit size of entry
+    if b4.key.len() + b4.value.len() + val.len() > 20_000 {return Err(DBError::Oversized);}
+
+    let mut raw_v : Value = serde_json::from_str(&b4.value).map_err(|e| DBError::Any(e.to_string()))?;
+    //expect the value to be an iterable, fail otherwise.
+    if let Value::Array(ref mut inner) = &mut raw_v 
+    {
+        inner.push(val_obj);
+    } 
+    else {return Err(DBError::NotIterable);}
+    let ser = serde_json::to_string(&raw_v).expect("Failed to serialize json after appending");
+    conn.execute("UPDATE storage SET value = $1 WHERE key = $2;",(ser,b4.key)) //doesnt support limit!
         .map_err(|e| DBError::DBError(e))?;
     return Ok(());
 }
@@ -153,7 +187,7 @@ mod test
     {
         let cnxn = init_db().unwrap();
         db_set(&cnxn, "hi", "bye").unwrap();
-        db_append(&cnxn, "hi", "bye").unwrap();
+        db_str_append(&cnxn, "hi", "bye").unwrap();
         let value = db_get(&cnxn, "hi").unwrap().unwrap().value;
         assert_eq!("byebye", value);
     }
@@ -163,7 +197,7 @@ mod test
     {
         let cnxn = init_db().unwrap();
         db_set(&cnxn, "hi", "bye").unwrap();
-        let e = db_append(&cnxn, "hi2", "bye");
+        let e = db_str_append(&cnxn, "hi2", "bye");
         assert!(e.is_err_and(|e| e == DBError::KeyDoesntExist));
     }
 
@@ -184,6 +218,25 @@ mod test
         db_set(&cnxn, "hi", "bye").unwrap();
         let e = db_delete(&cnxn, "hii");
         assert!(e.is_err_and(|e| e==DBError::KeyDoesntExist));
+    }
+
+    #[test]
+    fn json_append_t()
+    {
+        let cnxn = init_db().unwrap();
+        db_set(&cnxn, "hi", "[\"bye\"]").unwrap();
+        db_json_append(&cnxn, "hi", "\"bye\"").unwrap();
+        let value = db_get(&cnxn, "hi").unwrap().unwrap().value;
+        assert!(value == "[\"bye\",\"bye\"]");
+    }
+
+    #[test]
+    fn json_append_neg_t()
+    {
+        let cnxn = init_db().unwrap();
+        db_set(&cnxn, "hi", "\"bye\"").unwrap();
+        let e = db_json_append(&cnxn, "hi", "\"bye\"");
+        assert!(e.is_err_and(|e| e==DBError::NotIterable));
     }
 
     #[bench]

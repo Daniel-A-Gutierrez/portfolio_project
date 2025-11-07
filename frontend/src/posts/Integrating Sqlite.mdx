@@ -998,11 +998,11 @@ Now that we have set done, get is trivial - mostly a copy paste.
         struct KVGetRequest {key : String}
 
         #[debug_handler]
-        async fn kv_get(state : State<AppState>, req : Json<KVGetRequest>) -> Result<impl IntoResponse, String>
+        async fn kv_get(state: State<AppState>, req: Json<KVGetRequest>) -> Result<impl IntoResponse, String>
         {
             let cnxn = state.lock().await;
-            db_get(&cnxn, &req.key).map_err(|e| e.to_string())?;
-            return Ok(());
+            let entry = db_get(&cnxn, &req.key).map_err(|e| e.to_string())?;
+            return Ok(Json(entry));
         }
     ```
 </CodeSnippet>
