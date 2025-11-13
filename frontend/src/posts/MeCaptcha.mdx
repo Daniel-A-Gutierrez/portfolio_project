@@ -1,0 +1,310 @@
+---
+title : "MeCaptcha"
+description : "Because reCAPTCHA would be too easy I guess."
+preview : "/previews/KV Store.jpg"
+postnum : 8
+layout : '../layouts/ArticleLayout.astro'
+published : '11/10/2025'
+tags : ['Databases']
+draft : false
+---
+
+import CodeSnippet from '/src/components/CodeSnippet.astro';
+import PotluckThing from '/src/components/PotluckThing.svelte';
+import facepalm from '/src/images/facepalm.png';
+import ArticleImage from '/src/components/ArticleImage.astro';
+
+# Dealing with Bots
+Web scrapers gonna scrape, but I want to make sure that the only things touching my API endpoints are humans using 
+the GUI of the site, however, I don't wanna rely on CAPTCHA.  
+I'll probably have a unique hidden session key specifically for testing.  
+Id rather make my own, mostly for fun.  
+I don't expect it to stop a dedicated adversary from accessing the API, I just want it to require human effort. If that 
+effort comes in the form of designing a bot specifically to tackle the challenge that counts too.   
+I also want to do it without relying on images.   
+
+It should go like this :  
+1. GUI component loads another challenge component into itself from the server randomly on page load. 
+2. GUI Component issues a challenge
+3. The user input is sent to the server
+4. the server checks it, and issues a session token cookie if its correct, allowing some api use. 
+5. the masked component is revealed and made available for use. 
+
+For 1 I think I need a /challenges/\{slug\} (sortof) dynamic route like I use for posts. Each one will be a .astro file 
+containing just the challenge. On page load I'll have the component request a random one from the server, which will send 
+the rendered component through an api route. 
+
+# First steps 
+- Lets make a dumb challenge - just click a button. 
+- The dumb api route - always issues a session token. No cryptography, just a raw token, as a cookie. 
+- The dumb component - holds a ui element and hides it behind a button that says "Prove Your Humanity", 
+which opens a modal. The modal contains the challenge and allows the user to restart, submit, exit, or request a different challenge.
+
+This is going to be as complicated as the KV store so I'm not going to go into detail or make this a beginner's tutorial like 
+that one was, for the sake of time. 
+
+I like backend stuff more so I'll start there. 
+
+# Sessions
+I could just do a RWLock\<HashMap\> and call it a day but thats boring so I did some research and
+stumbled upon [DashMap](https://crates.io/crates/dashmap)
+I'll use that for session handling.
+
+<CodeSnippet filename="New Stuff In main.rs">
+``` rust
+    use dashmap::DashSet;
+    struct S
+    {
+        pub db: Mutex<rusqlite::Connection>,
+        pub sessions: DashSet<u128>
+    }
+    type AppState = Arc<S>;
+
+    //main.rs
+    let db = init_db().expect("Couldn't connect to database");
+    let state = Arc::new(S{db: Mutex::new(db), sessions : DashSet::new()});
+    let api_router = axum::Router::new()...
+                                        .with_state(state);
+
+    //handlers
+    #[debug_handler]
+    async fn kv_get(state: State<AppState>, req: Json<KVGetRequest>) -> Result<impl IntoResponse, String>
+    {
+        //let cnxn = &state.lock().await;
+        let cnxn = &state.db.lock().await;
+        ...
+    }
+
+```
+</CodeSnippet>
+
+This way we avoid having to lock the database connection when we dont need it.
+
+What I need now is a route to obtain a session token that generates a random u128 and adds it as a cookie in hexadecimal,
+as well as a middleware function that checks for a valid session cookie. 
+
+I also need a way of removing session cookies at a scheduled future time...I think I can do that with tokio::time::sleep.
+
+Need the cookie feature of axum and also rand.
+
+<CodeSnippet filename="main.rs::get_session"> 
+    ```rust 
+        use axum_extra::extract::cookie::{Cookie, CookieJar};
+        use rand::prelude::*;
+
+        #[derive(Deserialize)]
+        struct SessionRequest
+        {
+            answer:    String,
+            challenge: String,
+        }
+
+        #[debug_handler]
+        async fn get_session(state: State<AppState>,
+                            mut jar: CookieJar,
+                            req: Json<SessionRequest>)
+                            -> Result<impl IntoResponse, String>
+        {
+            //if theres already a session cookie and its in the map, delete it from the map.
+            if let Some(old_cookie) = jar.get("session_id")
+            {
+                let old_cookie : u128 = u128::from_str_radix(old_cookie.value(), 16)
+                    .map_err(|_| "Session ID must be hexadecimal")?;
+                state.sessions.remove(&old_cookie);
+            }
+
+            if req.answer == "please" 
+            {
+                let new_session : u128 = rand::rng().random::<u128>();
+                jar = jar.add(Cookie::new("session_id", format!("{:X}", new_session)));
+                return Ok((StatusCode::OK, jar));
+            }
+            return Ok((StatusCode::FORBIDDEN, jar));
+        }
+    ```
+</CodeSnippet>
+
+Ok heres our foolproof authentication handler!  
+Cookie jar is the only new part, and theres a small trick to it - jar.add doesnt mutate the jar, it 
+copies it and returns a new one. Also, it needs to be returned in the response or the client won't be able 
+to see any cookies you set. 
+
+from_str_radix and [format!](https://doc.rust-lang.org/std/fmt/) are from the stdlib.
+
+Oddly this old version of axum was really finnicky with the return types, and wouldn't accept a status code 
+alone as a response. 
+
+Now that theres a way to request a new session, I want a middleware that can check if that cookie exists
+and is in the map before running any api functions.
+
+<CodeSnippet filename="main.rs::check_session"> 
+    ```rust 
+        async fn check_session(state: State<AppState>,
+                            jar: CookieJar,
+                            req: Request<Body>,
+                            next: Next<Body>)
+                            -> impl IntoResponse
+        {
+            if let Some(cookie) = jar.get("session_id")
+            {
+                if let Ok(session_id) = u128::from_str_radix(cookie.value(), 16)
+                {
+                    if state.sessions.contains(&session_id)
+                    {
+                        return next.run(req).await.into_response();
+                    }
+                }
+                else
+                {
+                    return (StatusCode::UNAUTHORIZED, jar, "Session ID must be hexadecimal").into_response();
+                }
+            }
+            //its testy about just giving back the status code.
+            return (StatusCode::UNAUTHORIZED, jar, "").into_response();
+        }
+    ```
+</CodeSnippet>
+
+This is what a [middleware](https://docs.rs/axum/latest/axum/middleware/index.html) function looks like.  
+It'll run before and potentially after the handler, in a nested fashion with the bottom most middleware in the
+call stack wrapping everything above it and running first. 
+
+It expects at a minimum to take a request and potentially pass it to the next layer in the 'tower' through
+next.run(req). It may also take whatever response that returns and operate on it before returning it up to the 
+prior layer below it in the call stack.
+
+<CodeSnippet filename="main.rs"> 
+    ```rust 
+        let api_router = axum::Router::new().route("/kv_set", put(kv_set))
+                                            ...
+                                            .layer(from_fn_with_state(state.clone(), check_session))
+                                            .route("/get_session", post(get_session))
+                                            .with_state(state);
+    ```
+</CodeSnippet>
+
+This way get_session isnt protected by the authorization layer.  
+
+The easiest way to write middleware functions is using axum's 
+[from_fn](https://docs.rs/axum/latest/axum/middleware/fn.from_fn.html) and 
+[from_fn_with_state](https://docs.rs/axum/latest/axum/middleware/fn.from_fn_with_state.html) helpers.
+
+
+# Testing
+
+Not writing proper http tests bit me in the butt last time so I think a more thorough approach is in order.
+I'll be writing some tests that issue http requests against a running server using reqwest. 
+
+Moved the request structs from main.rs to lib.rs so I can access them from tests.rs to make things easy - 
+having strict response types would have been nice. 
+
+
+    ``` 
+        running 1 test
+        Response { url: "http://127.0.0.1:3334/get_session", status: 405, headers: {"allow": "GET,HEAD", "content-length": "0", "date": "Tue, 11 Nov 2025 02:27:12 GMT"} }
+
+        thread 'tests::test::e2e' panicked at src/tests.rs:35:26:
+        no set cookie header was set
+    ```
+
+This was a really simple mistake that cost me way too much time. Don't program tired!   
+It should have been "http://127.0.0.1:3334/api/get_session", but even though I messed it up it wasn't a 404 because it was 
+going to the directory server which expects a GET. 
+
+Getting used to reqwest again actually took quite a few mistakes - I'm going to skim over them - moral of the story is 
+to just use tracing on your server. I've skipped it thus far but I'll be implementing it next. 
+
+<CodeSnippet filename="e2e_tests.rs"> 
+    ``` rust 
+        const SERVER_URL: &'static str = "http://127.0.0.1:3334";
+
+        fn make_client() -> Client
+        {
+            let client =
+                reqwest::ClientBuilder::new().cookie_store(true)
+                                            .build()
+                                            .unwrap();
+            //specify common headers, test different http modes, etc.
+            return client;
+        }
+
+        enum Method
+        {
+            GET,
+            POST,
+            PUT,
+            DELETE,
+        }
+        fn client_method(c: &Client, m: Method, url: &str) -> RequestBuilder
+        {
+            match m
+            {
+                Method::GET => c.get(url),
+                Method::POST => c.post(url),
+                Method::PUT => c.put(url),
+                Method::DELETE => c.delete(url),
+            }
+        }
+
+        async fn api_request<T>(c: &Client, route: &str, m: Method, body: &T) -> Result<Response>
+            where T: ?Sized + Serialize
+        {
+            let req = client_method(c,m,& (format!("{}/api/{}", SERVER_URL, route)))
+                        .header(CONTENT_TYPE, "application/json")
+                        .body(to_json(body).unwrap());
+            let res = req.send().await?; 
+            return Ok(res);
+        }
+
+        #[test]
+        async fn e2e() -> Result<()>
+        {
+            let client = make_client();
+            let res1 = api_request(&client,
+                                "get_session",
+                                Method::POST,
+                                &SessionRequest { answer:    "please".to_string(),
+                                                    challenge: "hi".to_string(), }).await?;
+            assert!(res1.headers()
+                        .get(SET_COOKIE)
+                        .expect("no set cookie header was set")
+                        .to_str()?
+                        .contains("session_id"));
+            let (key, value) = ("hi".to_string(), "bye".to_string());
+            let _res2 = api_request(&client,
+                                    "kv_set",
+                                    Method::PUT,
+                                    &KVSetRequest { key: key.clone(),
+                                                    value }).await?;
+            let res3 = api_request(&client, "kv_get", Method::POST, &KVGetRequest { key }).await?
+                                                                                        .text()
+                                                                                        .await?;
+            let kvrow = serde_json::from_str::<KVRow>(&res3).unwrap();
+            assert!(kvrow.value == "bye");
+            return Ok(());
+        }
+    ```
+</CodeSnippet>
+
+I also tore my hair out for a while trying to figure out why the cookies werent working with reqwest - turns out, 
+1. cookies have to be toggled on on the client
+2. I forgot to actually track them on the server in the first place 
+
+<ArticleImage src={facepalm} height="100" alt="facepalm"/>
+
+<CodeSnippet filename="main.rs::get_session"> 
+    ```rust 
+        #[debug_handler]
+        async fn get_session(...)
+        {
+            ...
+                jar = jar.add(Cookie::new("session_id", format!("{:X}", new_session)));
+                
+                //was missing
+                state.sessions.insert(new_session); //this is why you dont program tired.
+                
+                return Ok((StatusCode::OK, jar));
+            ...
+        }
+    ```
+</CodeSnippet>

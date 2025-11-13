@@ -70,3 +70,6 @@ Ok i'm done optimizing for now, theres no free image cdn that im happy with.
 KV Store
 Rust Macros - Crabtime
 Typescript Macros 
+
+## 11/10/25
+Captcha ideas - word associations, svg coloring, rhythm game

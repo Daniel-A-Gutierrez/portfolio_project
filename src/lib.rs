@@ -1,19 +1,29 @@
 #![feature(test)]
 use std::fmt::Display;
-
-use anyhow::{ensure, anyhow, Result};
+mod tests;
+use anyhow::{anyhow, ensure, Result};
 use rusqlite::{self, Connection, OptionalExtension, Row};
-use serde::Serialize;
+use serde::{Deserialize, Serialize};
 use serde_json::Value;
 
-pub fn init_db() -> Result<Connection>
+#[derive(Deserialize, Serialize)]
+pub struct KVSetRequest
 {
-    let conn = Connection::open_in_memory()?;
-    //define schema
-    conn.execute("CREATE TABLE IF NOT EXISTS storage (id INTEGER PRIMARY KEY AUTOINCREMENT, 
-                  unixtime INTEGER, key TEXT UNIQUE, value TEXT);",
-                 ())?;
-    return Ok(conn);
+    pub key:   String,
+    pub value: String,
+}
+
+#[derive(Deserialize, Serialize)]
+pub struct KVGetRequest
+{
+    pub key: String,
+}
+
+#[derive(Deserialize, Serialize)]
+pub struct SessionRequest
+{
+    pub answer:    String,
+    pub challenge: String,
 }
 
 #[derive(Debug, PartialEq)]
@@ -24,7 +34,7 @@ pub enum DBError
     DBError(rusqlite::Error),
     Any(String),
     KeyDoesntExist,
-    NotIterable
+    NotIterable,
 }
 
 impl Display for DBError
@@ -41,14 +51,24 @@ impl Display for DBError
             {
                 println!("{:?}", e);
                 write!(f, "Internal Server Error")
-            },
+            }
             Self::Any(e) =>
             {
                 println!("{:?}", e);
                 write!(f, "Internal Server Error")
-            },
+            }
         }
     }
+}
+
+pub fn init_db() -> Result<Connection>
+{
+    let conn = Connection::open_in_memory()?;
+    //define schema
+    conn.execute("CREATE TABLE IF NOT EXISTS storage (id INTEGER PRIMARY KEY AUTOINCREMENT, 
+                  unixtime INTEGER, key TEXT UNIQUE, value TEXT);",
+                 ())?;
+    return Ok(conn);
 }
 
 pub fn db_set(conn: &Connection, key: &str, val: &str) -> Result<(), DBError>
@@ -68,7 +88,7 @@ pub fn db_set(conn: &Connection, key: &str, val: &str) -> Result<(), DBError>
     return Ok(());
 }
 
-#[derive(Debug,Serialize)]
+#[derive(Debug, Serialize, Deserialize)]
 pub struct KVRow
 {
     pub id:       i64,
@@ -103,18 +123,26 @@ pub fn db_get(conn: &Connection, key: &str) -> Result<Option<KVRow>, DBError>
     let value = conn.query_one("SELECT * FROM storage WHERE key = $1 LIMIT 1;", (key,), |row| {
                         Ok(KVRow::try_from(row).expect("Row did not match table schema"))
                     })
-                    .optional().map_err(|e| DBError::DBError(e))?;
+                    .optional()
+                    .map_err(|e| DBError::DBError(e))?;
     return Ok(value);
 }
 
 #[rustfmt::ignore]
 pub fn db_str_append(conn: &Connection, key: &str, val: &str) -> Result<(), DBError>
 {
-    if val.len() > 10_000 { return Err(DBError::Oversized); }
-    let mut b4 = db_get(conn,key)?.ok_or_else(|| DBError::KeyDoesntExist)?;
+    if val.len() > 10_000
+    {
+        return Err(DBError::Oversized);
+    }
+    let mut b4 = db_get(conn, key)?.ok_or_else(|| DBError::KeyDoesntExist)?;
     b4.value += val;
-    if b4.key.len() + b4.value.len() > 20_000 {return Err(DBError::Oversized);}
-    conn.execute("UPDATE storage SET value = $1 WHERE key = $2;",(b4.value,b4.key)) //doesnt support limit!
+    if b4.key.len() + b4.value.len() > 20_000
+    {
+        return Err(DBError::Oversized);
+    }
+    conn.execute("UPDATE storage SET value = $1 WHERE key = $2;",
+                 (b4.value, b4.key)) //doesnt support limit!
         .map_err(|e| DBError::DBError(e))?;
     return Ok(());
 }
@@ -122,43 +150,58 @@ pub fn db_str_append(conn: &Connection, key: &str, val: &str) -> Result<(), DBEr
 #[rustfmt::ignore]
 pub fn db_json_append(conn: &Connection, key: &str, val: &str) -> Result<(), DBError>
 {
-    if val.len() > 10_000 { return Err(DBError::Oversized); }
+    if val.len() > 10_000
+    {
+        return Err(DBError::Oversized);
+    }
     //val should be valid json
-    let val_obj = serde_json::from_str(val).map_err(|e| DBError::Any("Deserialization Error: ".to_string() + &e.to_string()))?;
+    let val_obj = serde_json::from_str(val).map_err(|e| {
+                                               DBError::Any("Deserialization Error: ".to_string()
+                                                            + &e.to_string())
+                                           })?;
 
-    let b4 = db_get(conn,key)?.ok_or_else(|| DBError::KeyDoesntExist)?;
+    let b4 = db_get(conn, key)?.ok_or_else(|| DBError::KeyDoesntExist)?;
     //limit size of entry
-    if b4.key.len() + b4.value.len() + val.len() > 20_000 {return Err(DBError::Oversized);}
+    if b4.key.len() + b4.value.len() + val.len() > 20_000
+    {
+        return Err(DBError::Oversized);
+    }
 
-    let mut raw_v : Value = serde_json::from_str(&b4.value).map_err(|e| DBError::Any(e.to_string()))?;
+    let mut raw_v: Value = serde_json::from_str(&b4.value).map_err(|e| DBError::Any(e.to_string()))?;
     //expect the value to be an iterable, fail otherwise.
-    if let Value::Array(ref mut inner) = &mut raw_v 
+    if let Value::Array(ref mut inner) = &mut raw_v
     {
         inner.push(val_obj);
-    } 
-    else {return Err(DBError::NotIterable);}
+    }
+    else
+    {
+        return Err(DBError::NotIterable);
+    }
     let ser = serde_json::to_string(&raw_v).expect("Failed to serialize json after appending");
-    conn.execute("UPDATE storage SET value = $1 WHERE key = $2;",(ser,b4.key)) //doesnt support limit!
+    conn.execute("UPDATE storage SET value = $1 WHERE key = $2;", (ser, b4.key)) //doesnt support limit!
         .map_err(|e| DBError::DBError(e))?;
     return Ok(());
 }
 
 pub fn db_delete(conn: &Connection, key: &str) -> Result<(), DBError>
 {
-    if key.len() > 10_000 {return Err(DBError::Oversized);}
+    if key.len() > 10_000
+    {
+        return Err(DBError::Oversized);
+    }
     conn.query_one("SELECT * FROM storage WHERE key = $1 LIMIT 1;", (key,), |row| {
-                    Ok(KVRow::try_from(row).expect("Row did not match table schema"))
-                })
-                .optional()
-                .map_err(|e| DBError::DBError(e))?
-                .ok_or_else(|| DBError::KeyDoesntExist)?;
-    conn.execute("DELETE FROM storage WHERE key = $1;",(key,))
+            Ok(KVRow::try_from(row).expect("Row did not match table schema"))
+        })
+        .optional()
+        .map_err(|e| DBError::DBError(e))?
+        .ok_or_else(|| DBError::KeyDoesntExist)?;
+    conn.execute("DELETE FROM storage WHERE key = $1;", (key,))
         .map_err(|e| DBError::DBError(e))?;
     return Ok(());
 }
 
 #[cfg(test)]
-mod test
+mod libtest
 {
     use super::*;
     extern crate test;
@@ -217,7 +260,7 @@ mod test
         let cnxn = init_db().unwrap();
         db_set(&cnxn, "hi", "bye").unwrap();
         let e = db_delete(&cnxn, "hii");
-        assert!(e.is_err_and(|e| e==DBError::KeyDoesntExist));
+        assert!(e.is_err_and(|e| e == DBError::KeyDoesntExist));
     }
 
     #[test]
@@ -236,7 +279,7 @@ mod test
         let cnxn = init_db().unwrap();
         db_set(&cnxn, "hi", "\"bye\"").unwrap();
         let e = db_json_append(&cnxn, "hi", "\"bye\"");
-        assert!(e.is_err_and(|e| e==DBError::NotIterable));
+        assert!(e.is_err_and(|e| e == DBError::NotIterable));
     }
 
     #[bench]

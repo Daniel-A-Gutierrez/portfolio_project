@@ -25,7 +25,7 @@ use on a daily basis is a bit like turning over a rock in the woods looking for 
 at the core of the IOS filesystem, Web Browsers, and is available as an official plugin for 
 the Unreal Engine. 
 
-SQLite is unique from most other databases in that it is in-processes, acting more like a
+SQLite is unique from most other databases in that it is in-process, acting more like a
 library rather than a distinct application or binary running on the client machine. 
 SQLite databases are also constrained to a single file and thread, making them simple to manage 
 and backup, while retaining many of the features and familiarity of SQL. 
@@ -52,7 +52,6 @@ section.
 
 <CodeSnippet filename="cargo.toml">
 ```toml 
-    ...
     [dependencies]
     anyhow = { version = "1.0.71" , features = ["std", "backtrace"]}
     axum = { version = "0.6.18", features = ["macros"] }
