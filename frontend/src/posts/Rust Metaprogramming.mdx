@@ -1,0 +1,1288 @@
+---
+title : "Rust Metaprogramming"
+description : "I've been avoiding this for years..."
+preview : "/previews/ferris.jpg"
+layout : '../layouts/ArticleLayout.astro'
+published : '11/20/2025'
+tags : ['Shaders']
+draft : false
+---
+import Noodle from "/src/images/wizard.jpg";
+import ArticleImage from "/src/components/ArticleImage.astro";
+import CodeSnippet from "/src/components/CodeSnippet.astro";
+
+During the height of the pandemic, I worked for a company that did 
+robotics and STEM education. All of our contracts dried up overnight and 
+my boss got sick with Covid so I had about a month of paid time to myself.
+I spent it making p5.js sketches for a math class I was developing,
+and learning rust. 
+
+It's been my language of choice since then, but even so I've  always felt
+that I hadn't truly mastered it. The reason for that is because a certain
+part of the language is so arcane and unlike anything else I've done that
+on the ocassions I've tried to dip my toes in, I was unable to get much deeper
+than the very surface level. It's [macros](https://doc.rust-lang.org/reference/macros-by-example.html).
+
+Maybe this time will be different though - I've got ADHD meds, caffeine, and 
+better things to do than sit here and bang my head on this, so lets get started.
+
+# Following Along 
+Since resources for learning this are somewhat sparse (or they used to be at least), I figured it'd be best
+to contribute by sharing my learning processes by including a playground iframe.
+
+You could also open the rust playground in a different tab but why bother?
+
+<iframe src="https://play.rust-lang.org/?version=stable&mode=debug&edition=2024&code=fn+main%28%29+%7B%0A++++println%21%28%22Hello%2C+macros!%21%22%29%3B%0A%7D" title="example" width="100%" height="400px"></iframe>
+
+
+# When Are Macros Useful 
+
+- When you need to take an arbitrary number or type of arguments. 
+- When you want to avoid writing / updating large amounts of repetitive code.
+- Automaticallly implementing traits with derive macros
+- Doing wacky shit that's not even really rust anymore.
+- Doing basically anything you want at compile time, like writing files or api requests. 
+- Injecting behavior (such as performance logging) for functions.
+
+I'll make each of those a goal, and consider this done when I've done all of them.  
+I think a good start would be to do some reading first, understand the basics,
+then start a project and try running those examples, modifying them, then finally 
+venturing off and doing some original stuff.
+
+# Types Of Macros 
+- [macro_rules!](https://doc.rust-lang.org/rust-by-example/macros.html) 
+- [proc macros](https://doc.rust-lang.org/reference/procedural-macros.html)   
+    Function-like macros - custom!(...)    
+    Derive macros - #[derive(CustomDerive)]  
+    Attribute macros - #[CustomAttribute]  
+- [CRAB TIME](https://docs.rs/crabtime/latest/crabtime/) 
+
+It seems like I wont be able to use the rust sandbox for proc-macros.   
+There's a requirement that they're defined in a separate crate from the one 
+they're being used in. For clarity's sake the folder structure im working with is   
+    macros   
+    macros/macros/cargo.toml  
+    macros/proc-macros/cargo.toml  
+
+# Macro Rules! 
+Honestly I feel like the syntax for these is the most complex so we're taking a big first 
+bite here. Lets start by reading some documentation and [examples](https://leapcell.medium.com/macros-vs-functions-in-rust-when-to-use-which-923f90f8d570).
+
+<CodeSnippet filename="getters">
+```rust 
+    // Define a macro to generate getter methods for a struct
+    macro_rules! generate_getters {
+        ($struct_name:ident, $($field:ident),*) => {
+            impl $struct_name {
+                $(
+                    pub fn $field(&self) -> &str {
+                        &self.$field
+                    }
+                )*
+            }
+        };
+    }
+
+    struct Person {
+        name: String,
+        email: String,
+    }
+
+    generate_getters!(Person, name, email);
+
+    fn main() {
+        let person = Person {
+            name: "Alice".to_string(),
+            email: "alice@example.com".to_string(),
+        };
+        println!("Name: {}", person.name());
+        println!("Email: {}", person.email());
+    }
+```
+</CodeSnippet>
+
+Ok so going by this [reference](https://doc.rust-lang.org/reference/macros-by-example.html)
+'generate_getters' is an IDENTIFIER, and the following bits are a MacroRulesDef.
+
+<CodeSnippet filename="macro use syntax tree">
+```
+    Syntax
+    MacroRulesDefinition →
+        macro_rules ! IDENTIFIER MacroRulesDef
+
+    MacroRulesDef →
+        ( MacroRules ) ;
+        | [ MacroRules ] ;
+        | { MacroRules }
+
+    MacroRules →
+        MacroRule ( ; MacroRule )* ;?
+
+    MacroRule →
+        MacroMatcher => MacroTranscriber
+
+    MacroMatcher →
+        ( MacroMatch* )
+        | [ MacroMatch* ]
+        | { MacroMatch* }
+
+    MacroMatch →
+        Tokenexcept $ and delimiters
+        | MacroMatcher
+        | $ ( IDENTIFIER_OR_KEYWORDexcept crate | RAW_IDENTIFIER | _ ) : MacroFragSpec
+        | $ ( MacroMatch+ ) MacroRepSep? MacroRepOp
+
+    MacroFragSpec →
+        block | expr | expr_2021 | ident | item | lifetime | literal
+        | meta | pat | pat_param | path | stmt | tt | ty | vis
+
+    MacroRepSep → Tokenexcept delimiters and MacroRepOp
+
+    MacroRepOp → * | + | ?
+
+    MacroTranscriber → DelimTokenTree
+```
+</CodeSnippet>
+
+MacroRulesDef is either "( MacoRules );" or "[ MacroRules ]" or "\{ MacroRules };"
+
+MacroRules is a "MacroRule ( ; MacroRule) * ;?" Which I think means that the ; at the end is optional.  
+The X(;X) * syntax is offputting but I guess I can get used to it. 
+
+The inside of a macro rules is similar to a big match statement - or a case statement if you're 
+not a rust native. Honestly props to you if you aren't, you have way too much faith in me
+to make this digestible. Geniunely I'm just going to stream of conscioussness this whole thing as I learn.
+
+A MacroRule is "MacroMatcher=>MacroTranscriber" . Oh so the reason the semicolon was optional earlier is probably
+because the final rule doesn't require one. 
+So the bit with the MacroRules 2 paragraphs up means that X(;X)*;? is just how we express a list 
+of things in this context. Hate that tbh. So thatd be X, followed by any number (including 0) ";X" 's, terminated 
+with a for-some-reason optional final ;...? Lets just keep reading.
+
+A MacroMatcher is any of the enclosing things "[]\{}()" around a MacroMatch*.
+I'm not sure what that star means and it worries me. Looking at the diagram 
+it must mean that the macro matches don't need any sort of separator and themselves
+can be repeated or skipped...
+
+So then the asterisk just means that the single thing it succeeds is repeated 0 
+or more times, and the parens on the MacroRules definition are there to make it repeat the whole ";X" instead of just "X".
+
+Ok, a MacroMatch is any token at all except $ and "delimiters". What's a delimiter... oh its an enclosing thing ie "()[]\{}".
+A token is a BIG enum over 
+- IDENTIFIER : Basically a name for a variable, function, namespace, crate, etc.?
+- NON_KEYWORD_IDENTIFIER : any of the other variants but not [these keywords](https://doc.rust-lang.org/reference/keywords.html#r-lex.keywords.strict)
+- RAW_IDENTIFIER (with exceptions) : "r#struct" apparently lets you use 'struct' as an identifier, just by prefixing it with r#.   
+    Neat. The exceptions are crate, self, super, _, and Self. 
+- IDENTIFIER_OR_KEYWORD : Any of the above or some special characters like XID_Start etc. 
+- CHAR_LITERAL : 'a' , '1' , etc. 
+- STRING_LITERAL : "abcd"
+- RAW_STRING_LITERAL: Ok this is neat - " \"abcd\" " == r#" "abcd" "#. Use more # for more automatic escapes.
+- BYTE_LITERAL: b'c' : a single ascii byte for the c character. 
+- BYTE_STRING_LITERAL : b"abcd"
+- C_STRING_LITERAL : c"" = b"\x00", auto terminated with 0x00; 
+- RAW_C_STRING_LITERAL : Like raw strings , but also c strings. 
+- INTEGER_LITERAL, FLOAT_LITERAL: self explanatory (actually rlly complex but dw about it)
+- LIFETIME_TOKEN: "'IDENTIFIER_OR_KEYWORD" i guess that means 'self and 'super are valid lifetimes, which makes sense.  
+    Not allowed for loop or block labels though. 
+- PUNCTUATION : A very long list of stuff like :, ::, . , > , ->, =, etc. 
+- RESERVED_TOKEN: Stuff you'll never use anyway, like ### . 
+
+Even though they're not in that list delimiters are also apparently tokens. 
+The broad categories are 
+- Keywords 
+- Identifiers 
+- Literals 
+- Lifetimes 
+- Punctuation 
+- Delimeters
+
+Where were we ... right, macro match. A MacroMatch is 
+- any Token except Delimters and $.
+- A MacroMatcher which itself is a list of MacroMatches? Weird. 
+- $(IDENTIFIER_OR_KEYWORD except crate OR a raw identifier. OR _ ) : MacroFragSpec 
+
+Wait wtf is a MacroFragSpec? Its apparently a pretty big type - 
+- block
+- expr
+- ident
+- item
+- lifetime
+- literal
+- "meta" whatever that means
+- pat
+- pat_param
+- path
+- stmt
+- tt
+- ty
+- vis - maybe like, "pub" ?   
+Lets put this aside for now... 
+
+Basically a MacroMatcher is either "Token (boring)" or "$Identifier:MacroFragSpec" OR "$(MacroMatch+) MacroRepSep? MacroRepOp"
+
+- MacroFragSpec : Oh - well anyway, its one of that big list of things. Oh wait, no its literally the name of the thing. 
+as in "block" is a MacroFragSpec. OK, so we're matching on if "$ident:Block" , if $ident is a block or a identifier or a item or what. 
+- MacroRepSep : is any token except delimiters, *, + , OR ? . Just a character / string for going between successive items I guess. 
+- MacroRepOp :*, + , or ? - the weird characters. 
+- MacroTranscriber : "DelimTokenTree" Ok really if its just going to be 1:1 is it really necessary to split them up...
+- DelimTokenTree : OK this is a recursive definition, the entire body of the macro_rules! is a DelimTokenTree. It's basically "[anything]" 
+
+# Items 
+Ok i've stumbled upon something useful so I'm just going to leave it here.  
+An item is something in a crate, and follows the pattern  
+OuterAttribute* (VisItem | MacroItem) 
+
+A VisItem is any item that can be 'pub' or not, including 
+- Module
+- ExternCrate
+- UseDeclaration
+- Function
+- TypeAlias
+- Struct
+- Enumeration 
+- Union
+- ConstantItem
+- StaticItem
+- Trait
+- Implementation
+- ExternBlock 
+A MacroItem is either a macro invocation, or a MacroRulesDefinition.
+
+An OuterAttribute is something like a #[derive(Trait)] or [rustfmt::skip], it applies an attribute to the
+thing following it. 
+
+An InnerAttribute applies to the thing its in, like #![feature(SomethingUnstable)] in a crate's main.rs. 
+
+# Taking Apart That Macro 
+<CodeSnippet filename="autopsy">
+```rust 
+    // Define a macro to generate getter methods for a struct
+    macro_rules! generate_getters {
+        ($struct_name:ident, $($field:ident),*) => {
+            impl $struct_name {
+                $(
+                    pub fn $field(&self) -> &str {
+                        &self.$field
+                    }
+                )*
+            }
+        };
+    }
+```
+</CodeSnippet>
+
+Lets go through and label each part of this with what it is. 
+
+- macro_rules! : hardcoded part of the macro rules definition. notably, not a macro
+- generate_getters : IDENTIFIER 
+- \{everything else}; : MacroRulesDef, the "everything else" is MacroRules 
+- ($struct_name:ident, $($field:ident), *) : A macro matcher, the bits inside are MacroMatches.
+- $struct_name:ident, : $IDENTIFIER:MacroFragSpec , we're matching on an identifier and calling it struct_name. 
+- "$($field:ident), *" : The third arm of MacroMatch, a recursive list match. 
+    We're expecting a comma separated list of at least 0 identifiers, and naming it "field"  
+- => \{ MacroTranscriber } 
+- This bit is going to be output more or less literally with the  
+    $ identifying identifiers to use from the macromatchers 
+- impl $struct_name \{ $(stuff)* } : will create a impl block for $struct_name with  
+    a function for each $field 
+- pub fn $field(&self) -> &str \{&self.$field} : the getter that takes "&self" and returns "&self.$field".
+
+Notably this macro doesnt return the right type for the getter - it only ever returns &str, regardless of the type of $field.
+
+Maybe we can try improving/fixing it?
+
+# A Possibly Premature Attempt To Fix A Macro
+
+Ok interestingly enough, $struct_name can't be an Item. Going by the description of Item vs identifier I thought
+it would be but I guess not. 
+
+What we need is some sort of reflection to get the $type of each $field.  
+I think this is where the syn crate comes in.  
+Because there's no autocomplete suggestions for $field.
+
+Nope I was wrong, 1. syn is for proc macros only prettymuch, and 2. the macro 
+doesnt have reflection or anything, it doesn't necessarily know about the rest of the stuff around it, 
+including the types of the idents its working on. 
+
+I can either pass it the types directly, wrap the whole struct in the macro, or give up and use a derive macro which probably would make more sense.
+
+We're learning macros right now so lemme try the first 2. 
+
+<CodeSnippet filename="Take Types">
+```rust 
+  // Define a macro to generate getter methods for a struct
+    macro_rules! generate_getters {
+        ($struct_name:ident, $($field:ident -> $type:ident),*) => {
+            impl $struct_name {
+                $(
+                    pub fn $field(&self) -> &$type {
+                        &self.$field
+                    }
+                )*
+            }
+        };
+    }
+
+    struct Person {
+        name: String,
+        email: i64,
+    }
+
+    generate_getters!(Person, name -> String, email -> i64);
+
+    fn main() {
+        let person = Person {
+            name: "Alice".to_string(),
+            email: 55,
+        };
+        println!("Name: {}", person.name());
+        println!("Email: {}", person.email());
+    }
+```
+</CodeSnippet>
+
+Ok, that works. I even made it use a return symbol instead of commas!
+I'm unreasonably excited about that for some reason. 
+
+Also errors are weird, if I pass the macro the wrong types the error's dont appear 
+in the invocation of the macro, but at the definition on line 7. Not helpful.
+
+# Committing Crime 
+I'm going to do something super ugly - I'm going to wrap the whole struct definition in 
+the macro invocation and parse it to produce the impl block. 
+
+But lets start small 
+
+
+<CodeSnippet filename="">
+```rust 
+    macro_rules! crime 
+    {
+        ($s : ident) => 
+        {
+            $s
+        }
+    }
+
+    crime!{struct} Guy()
+```
+</CodeSnippet>
+
+
+<CodeSnippet filename="error">
+```
+    no rules expected `Guy`
+    no rules expected this token in macro call
+```
+</CodeSnippet>
+
+
+Ok so that doesn't work, I think rust prefers the stuff output by the macro to 
+have valid syntax on its own. I can continue like this to find out what frag each token is though as I write.
+
+
+<CodeSnippet filename="crime2">
+```rust 
+    macro_rules! crime 
+    {
+        ($s : ident, $struct_name:item, ) => 
+        {
+            $s
+        }
+    }
+
+    crime!{struct Guy {} }
+```
+</CodeSnippet>
+This doesn't work either for some reason...
+
+<CodeSnippet>
+```rust
+    macro_rules! crime 
+    {
+        ($s : ident $struct_name:ident ) => 
+        {
+            $s $struct_name ();
+        }
+    }
+
+    crime!{struct Guy}
+```
+</CodeSnippet>
+Progress! You don't need commas if theyre not expected in the input. 
+
+<CodeSnippet filename="crime3">
+```rust 
+    macro_rules! crime 
+    {
+        ($s : ident $struct_name:ident {$($field_name:ident : $field_type:ident),*}) => 
+        {
+            $s $struct_name { $($field_name : $field_type),* }
+        }
+    }
+
+    crime!{struct Guy{age : u8, hairs : u8}}
+```
+</CodeSnippet>
+We've got a macro that takes a struct definition -  AND DEFINES A STRUCT. WOW!
+
+Jokes aside though now we can do the crime. 
+
+<CodeSnippet filename="crime.rs">
+```rust 
+    macro_rules! crime 
+    {
+        ($s : ident $struct_name:ident {$($v:vis $field_name:ident : $field_type:ty),+}) => 
+        {
+            $s $struct_name { $($v $field_name : $field_type),+ }
+            impl $struct_name {
+                $(
+                    pub fn $field_name(&self) -> &$field_type 
+                    {
+                        &self.$field_name
+                    }
+                )*
+            }
+        }
+    }
+
+    crime!{struct Guy{age : u8, hairs : u8}}
+
+    fn main() {
+        let guy = Guy {age : 34, hairs : 0};
+        println!("Man, age {} has {} hairs left", guy.age(), guy.hairs()); 
+    }
+```
+</CodeSnippet>
+<mono>Man, age 34 has 0 hairs left</mono>
+
+I wanted to make the functions for each field get_field but it turns out you cant
+transform tokens in any way without procedural macros which kindof sucks but whatever.
+
+Man, I simultaneously love and hate this. On one hand, its super fucking hideous,
+but on the other hand, I can look at this and understand it, and hell I'm the one who wrote it.  
+Kinda surreal.
+
+At the same time though, they're more limited than I expected. 
+I think this basically just writes code that then runs at runtime - 
+I can't make it precompute some complex value without using a const fn, at which point,
+i should just use a const fn. 
+
+I want to write one more before we move on - something that wraps a string literal in a string.
+
+<CodeSnippet>
+```rust 
+
+    macro_rules! s 
+    {
+        ($str : literal) => {$str.to_string()}
+    }
+
+    macro_rules! ss
+    {
+        ($s1: expr, $($sn : expr),*) => { ($s1.to_string()$(+&$sn)* )}
+    }
+
+    macro_rules! js
+    {
+        ($s1: expr, $($sn : expr),*) => { ($s1.to_string()$(+&$sn.to_string())* )}
+    }
+
+    fn main() {
+        println!("{}", s!("birds and ") + "bees");
+        println!("{}", ss!("birds", " and", " bees", 42.to_string())); 
+        println!("{}", js!("ba" , (0.0/0.0) , "a"));
+    }
+```
+</CodeSnippet>
+Output: 
+<blockquote>
+birds and bees  
+birds and bees42  
+baNaNa  
+</blockquote>
+
+Perfection.
+
+Some last things before we move on -  
+I noticed that the MacroFragSpecs aren't mutually exclusive. tys , types, are identifiers which themselves 
+are often expressions, which are token trees. However, the pattern matching isn't allowed to be ambiguous, so that gets into 
+what separators are allowed between each. 
+
+Theres also more to exporting and importing macros using #[macro_export] and 
+#[macro_use], and weird ass scoping rules. Definitely give the [reference](https://doc.rust-lang.org/reference/macros-by-example.html#railroad-MacroFragSpec) a once 
+over if you get stumped.
+
+Oh, and I found this example in the reference for each type of MacroFragSpec 
+
+<CodeSnippet filename="syntax">
+```rust
+    // Used as an expression.
+    let x = vec![1,2,3];
+
+    // Used as a statement.
+    println!("Hello!");
+
+    // Used in a pattern.
+    macro_rules! pat {
+        ($i:ident) => (Some($i))
+    }
+
+    if let pat!(x) = Some(1) {
+        assert_eq!(x, 1);
+    }
+
+    // Used in a type.
+    macro_rules! Tuple {
+        { $A:ty, $B:ty } => { ($A, $B) };
+    }
+
+    type N2 = Tuple!(i32, i32);
+
+    // Used as an item.
+    thread_local!(static FOO: RefCell<u32> = RefCell::new(1));
+
+    // Used as an associated item.
+    macro_rules! const_maker {
+        ($t:ty, $v:tt) => { const CONST: $t = $v; };
+    }
+    trait T {
+        const_maker!{i32, 7}
+    }
+
+    // Macro calls within macros.
+    macro_rules! example {
+        () => { println!("Macro call in a macro!") };
+    }
+    // Outer macro `example` is expanded, then inner macro `println` is expanded.
+    example!();
+```
+</CodeSnippet>
+
+# Proc Macros 
+OK I expect this to be hard in a different way.  
+The background we've gotten from macro_rules! should help a ton though. 
+
+In our proc macro crate adjacent to the previous one, we need to add something
+to cargo.toml. 
+
+<CodeSnippet>
+```toml
+    [lib]
+    proc-macro = true
+    [dependencies]
+    syn = "2.0"
+    quote = "1.0"
+```
+</CodeSnippet>
+
+I'll be following the bit on proc macros in [the book](https://doc.rust-lang.org/book/ch20-05-macros.html#procedural-macros-for-generating-code-from-attributeshttps://doc.rust-lang.org/book/ch20-05-macros.html#procedural-macros-for-generating-code-from-attributes)
+first and then we'll go from there. When I read it I don't recall this section existing...
+
+# Starter Template 
+
+<CodeSnippet filename="lib.rs">
+```rust
+    use proc_macro::TokenStream;
+    use quote::quote;
+
+    pub trait Greet
+    {
+        fn greet();
+    }
+
+    #[proc_macro_derive(Greet)]
+    pub fn greet_derive(input: TokenStream) -> TokenStream
+    {
+        let ast = syn::parse::<syn::DeriveInput>(input).unwrap();
+    
+        impl_greet_macro(&ast);
+    }
+
+    fn impl_greet_macro(ast :&syn::DeriveInput) -> TokenStream
+    {
+        let name = ast.ident;
+        let generated = quote!{
+            impl Greet for #name {
+                fn greet(){ println!("Hello, Macro! My name is {}!", stringify(#name) ); }
+            }
+        };
+        return generated.into();
+    }
+
+```
+</CodeSnippet>
+
+Ok lets go over this. 
+quote is the library that fullfills the funciton of the MacroTranscriber block in macro_rules! - 
+it takes what we wrote and spits it out as a token stream.
+
+This is a derive macro, so we define a trait and a macro that will automatically 
+impl it for an Enum, Struct, or Union - thats greet_derive. 
+
+It gets a token stream, which we use syn to attempt to parse into a DeriveInput.  
+If that fails, we panic because we can't return results here. 
+
+We then pass that to our own function that actually makes use of the DeriveInput and quote! to 
+generate the macro output. 
+
+Honestly so much simpler than macro_rules!. 
+
+Lets take a look into DeriveInput, pull the cables out of the back and see what 
+mess we find.
+
+<CodeSnippet filename="derive.rs">
+```rust
+    ast_struct! {
+        /// Data structure sent to a `proc_macro_derive` macro.
+        #[cfg_attr(docsrs, doc(cfg(feature = "derive")))]
+        pub struct DeriveInput {
+            pub attrs: Vec<Attribute>,
+            pub vis: Visibility,
+            pub ident: Ident,
+            pub generics: Generics,
+            pub data: Data,
+        }
+    }
+
+    ast_enum! {
+        #[cfg_attr(docsrs, doc(cfg(feature = "derive")))]
+        pub enum Data {
+            Struct(DataStruct),
+            Enum(DataEnum),
+            Union(DataUnion),
+        }
+    }
+
+    ast_struct! {
+        /// A struct input to a `proc_macro_derive` macro.
+        #[cfg_attr(docsrs, doc(cfg(feature = "derive")))]
+        pub struct DataStruct {
+            pub struct_token: Token![struct],
+            pub fields: Fields,
+            pub semi_token: Option<Token![;]>,
+        }
+    }
+
+    //elsewhere...
+    pub enum Fields {
+        /// Named fields of a struct or struct variant such as `Point { x: f64,
+        /// y: f64 }`.
+        Named(FieldsNamed),
+        /// Unnamed fields of a tuple struct or tuple variant such as `Some(T)`.
+        Unnamed(FieldsUnnamed),
+        /// Unit struct or unit variant such as `None`.
+        Unit,
+    }
+
+    #[cfg_attr(docsrs, doc(cfg(feature = "parsing")))]
+    impl Parse for DeriveInput {
+        fn parse(input: ParseStream) -> Result<Self> {
+            let attrs = input.call(Attribute::parse_outer)?;
+            let vis = input.parse::<Visibility>()?;
+
+            let lookahead = input.lookahead1();
+            if lookahead.peek(Token![struct]) {
+                let struct_token = input.parse::<Token![struct]>()?;
+                let ident = input.parse::<Ident>()?;
+                let generics = input.parse::<Generics>()?;
+                let (where_clause, fields, semi) = data_struct(input)?;
+                Ok(DeriveInput {
+                    attrs,
+                    vis,
+                    ident,
+                    generics: Generics {
+                        where_clause,
+                        ..generics
+                    },
+                    data: Data::Struct(DataStruct {
+                        struct_token,
+                        fields,
+                        semi_token: semi,
+                    }),
+                })
+            } else if lookahead.peek(Token![enum]) { ...
+```
+</CodeSnippet>
+
+OK this is super neat actually - we've got the syntax of a rust struct definition
+expressed as a giant tree of types. 
+
+<CodeSnippet>
+```
+    vis struct ident \<generics::params,> \<generics::where_clause>  
+    \{FieldsNamed} | (FieldsUnnamed,) | (Unit)
+```
+</CodeSnippet>
+
+So data then is everything inside the contents of the struct, including the braces 
+technically.
+
+# quote
+
+Ok there's a bit to this but its not too complicated. Besides quote!, the 
+documentation mentions a few other things : 
+
+- quote_spanned! : You can get the span of basically anything from syn or proc_macro,   
+    ie where it occurs in code, and use quote_spanned to make errors appear there when they occur in the macro.
+- prettyplease can be used to make generated code look nice.
+- format_ident!() : like format but it can take in ident's and outputs the modified name!  
+This is what I needed for making my getters earlier. 
+
+Ok onto the meat : 
+
+Repetitions! 
+
+In macro_rules we used $($var anything else)sep[*,+,?] in the matcher then the same
+syntax in the output. 
+
+With quote we do substitutions, aka interpolation, with #var instead, and the repetition 
+syntax is similarly #(#var anything else)sep[*,+,?] . 
+
+The difference is that now we're pulling from iterators we can take into the macro as arguments 
+or create there as data. 
+
+For example we could do  ...
+
+# A Hiccup - Crate Structure And Imports
+
+Ok so it turns out the example code that the rust book gives us doesn't actually work.  
+If you want to get it to actually run, you need a minimum of 3 crates.  
+My macros folder now has 
+- macros/macros 
+- macros/proc_macros 
+- macros/deriveable_traits 
+
+deriveable_traits literally just has a lib.rs with 
+<CodeSnippet filename="deriveable_traits/src/lib.rs">
+```rust 
+    pub trait Greet{ fn greet(); }
+```
+</CodeSnippet>
+
+proc_macros imports it in cargo.toml with 
+<CodeSnippet filename="proc_macros/cargo.toml">
+```rust 
+    [dependencies]
+    deriveable_traits = {path="../deriveable_traits"}
+    ...
+```
+</CodeSnippet>
+
+Then imports it and defines its proc macros 
+
+The consumer, macros, imports it the same way that proc_macros imports deriveable_traits and finally 
+
+<CodeSnippet filename="macros/main.rs">
+```rust 
+    #[macro_use]
+    mod macro_rules;
+    use macro_rules::*;
+    use proc_macros::*;
+    use deriveable_traits::Greet;
+
+    #[derive(Greet)]
+    struct Doh();
+
+    fn main() {
+        ...
+        //Hello, Macro! My name is Doh!
+        Doh::greet();
+    }
+```
+</CodeSnippet>
+
+And finally it works! I will note though, rust-analyzer doesnt keep up. 
+It reports errors that don't exist, so you'll need to just do "cargo build"
+through the terminal.
+
+It actually took running "cargo clean" then "cargo build" in proc_macros and 
+restarting vscode to get the errors to go away. 
+
+# Back To Repetitions!
+
+<CodeSnippet filename="proc_macros/lib.rs">
+```rust 
+    fn impl_greet_macro(ast :&syn::DeriveInput) -> TokenStream
+    {
+        let name = &ast.ident;
+        let rname = std::iter::repeat_n(&ast.ident,4);
+        let generated = quote!{
+            impl Greet for #name {
+                fn greet(){
+                    #(println!("Hello, Macro! My name is {}!", stringify!(#rname) );)*
+                }
+            }
+        };
+        return generated.into();
+    }
+```
+</CodeSnippet>
+
+Like I was trying to demonstrate earlier, any iterable can be repeated on using 
+the # version of the macro_rules! like syntax from quote! 
+
+Running this prints 
+
+<CodeSnippet>
+```
+    Hello, Macro! My name is Doh!
+    Hello, Macro! My name is Doh!
+    Hello, Macro! My name is Doh!
+    Hello, Macro! My name is Doh!
+```
+</CodeSnippet>
+
+# Other Need To Know's About quote!
+
+We're allowed to use multiple helper functions and 
+combine their outputs together using quote! like so 
+
+<CodeSnippet>
+```rust 
+    let type_definition = quote! {...};
+    let methods = quote! {...};
+
+    let tokens = quote! {
+        #type_definition
+        #methods
+    };
+```
+</CodeSnippet>
+
+Calling functions and trait methods should be done in a particular way : 
+
+<CodeSnippet>
+```rust 
+    quote! {let value = #field_type::new()} // bad 
+    quote! {let value = <#field_type>::new();} //good 
+    quote! {let value = <#field_type as core::default::Default>::default();} //for trait methods like Default
+```
+</CodeSnippet>
+
+Comments dont get interpolated variables, but you can do 
+<CodeSnippet>
+```rust 
+    #[doc = "try to interpolate: #ident"]
+```
+</CodeSnippet>
+
+And lastly, if you're trying to interpolate tuple indeces, use 
+<CodeSnippet>
+```rust 
+    let i = 0usize..self.fields.len(); //bad, results in "tuple.0usize.heap_size()
+    let i = (0..self.fields.len()).map(syn::Index::from); 
+
+    // expands to 0 + self.0.heap_size() + self.1.heap_size() + ...
+    quote! {
+        0 #( + self.#i.heap_size() )*
+    }
+```
+</CodeSnippet>
+
+# Attribute-Like Macros 
+
+I've used these very sparingly. They can be attached to basically anything 
+as far as I can tell so I imagine the structure is much less defined compared to
+DeriveInput. 
+
+The rust book doesn't really tell us much more than that. Lets see if there's 
+some examples we can find...
+
+<CodeSnippet filename="leapcell example">
+```rust 
+    #[proc_macro_attribute]
+    pub fn log_execution(_attr: TokenStream, item: TokenStream) -> TokenStream {
+        let input = syn::parse_macro_input!(item as syn::ItemFn);
+        let fn_name = &input.sig.ident;
+        let block = &input.block;
+
+        let expanded = quote::quote! {
+            fn #fn_name() {
+                println!("Entering function {}", stringify!(#fn_name));
+                #block
+                println!("Exiting function {}", stringify!(#fn_name));
+            }
+        };
+
+        TokenStream::from(expanded)
+    }
+```
+</CodeSnippet>
+
+Ok that helps. So we can basically just force TokenStream to be anything from syn with 'as' I guess.
+
+Nothing on using the attribute arguments though...
+
+...
+
+Actually wait that proc macro doesn't even work. 
+
+
+
+
+
+<CodeSnippet>
+```rust
+    error[E0412]: cannot find type `ItemFn` in crate `syn`
+    --> /home/d/Documents/Projects/macros/proc-macros/src/lib.rs:51:54
+        |
+    51  |     let input = syn::parse_macro_input!(item as syn::ItemFn);
+        |                                                      ^^^^^^ not found in `syn`
+        |
+    note: found an item that was configured out
+    --> /home/d/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/syn-2.0.110/src/lib.rs:428:43
+        |
+    428 |     ItemConst, ItemEnum, ItemExternCrate, ItemFn, ItemForeignMod, ItemImpl, It...
+        |                                           ^^^^^^
+    note: the item is gated behind the `full` feature
+    --> /home/d/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/syn-2.0.110/src/lib.rs:423:7
+        |
+    423 | #[cfg(feature = "full")]
+```
+</CodeSnippet>
+
+It seems syn needs its "full" feature enabled for attribute macros that go
+on functions. Easy enough. 
+
+OK according to this [little book of macros](https://lukaswirth.dev/tlborm/proc-macros/methodical/attr.html)
+the first argument for an attribute like macro is the part inside the () of the macro invocation, 
+so  
+
+<CodeSnippet>
+```rust
+    //macros::main
+    #[limit_recursion(3)]
+    fn fib(n : u32) -> u32
+    {
+        if n <= 1 {return n}
+        return fib(n-1)+fib(n-2);
+    }
+
+    //proc_macros
+    #[proc_macro_attribute]
+    pub fn limit_recursion(attr: TokenStream, item: TokenStream) -> TokenStream {
+        let limit = syn::parse_macro_input!(attr as syn::LitInt);
+        let input = syn::parse_macro_input!(item as syn::ItemFn);
+        let fn_name = &input.sig.ident;
+        let fn_sig = &input.sig;
+        let block = &input.block;
+
+        let expanded = quote::quote! {
+            #fn_sig {
+                println!("Please don't recur more than {} times.", #limit);
+                #block
+            }
+        };
+        TokenStream::from(expanded)
+    }
+```
+</CodeSnippet>
+
+There we go, a macro that politely asks a function not to recur! 
+
+If I wanted to actually set a recursion limit I'd probably do something like this.
+<CodeSnippet>
+```rust
+    #[limit_recursion(n)]
+    fn recursive(#args) -> Result<#return type>
+    {
+        _recursive_tail(#n, #args)
+    }
+
+    fn _recursive_tail(n : usize, args) -> Result<#return type>
+    {
+        n -= 1;
+        if(n==0){ return Err("Custom Recursion Limit Reached"); }
+        #body //but where any call to 'recursive' becomes a call to 
+        //_recursive_tail(n, etc. )
+    }
+```
+</CodeSnippet>
+
+These definitely seem the most powerful but I'm also getting tired so lets 
+move on to function like macros.
+
+# Function Like Proc Macros
+These are invoked the same way as macro_rules!() but they have all the power of a 
+proc macro. 
+
+They take 1 token stream as an argument, do whatever they want to it, and return 
+a valid token stream. 
+
+How about this - a nice little macro debugging tool. 
+
+<CodeSnippet>
+```rust
+    #[proc_macro]
+    pub fn tokenize(tokens: TokenStream) -> TokenStream 
+    {
+        let iter = tokens.clone().into_iter();
+        for i in iter 
+        {
+            println!("{:?}", i);
+        }
+        return tokens;
+    }
+```
+</CodeSnippet>
+
+<CodeSnippet>
+```rust
+    tokenize!(3.0 + 44.0 / 2.0 );
+    //prints out
+    Literal { kind: Float, symbol: "3.0", suffix: None, span: #0 bytes(768..771) }
+    Punct { ch: '+', spacing: Alone, span: #0 bytes(772..773) }
+    Literal { kind: Float, symbol: "44.0", suffix: None, span: #0 bytes(774..778) }
+    Punct { ch: '/', spacing: Alone, span: #0 bytes(778..779) }
+    Literal { kind: Float, symbol: "2.0", suffix: None, span: #0 bytes(779..782) }
+```
+</CodeSnippet>
+
+
+
+
+I've also discovered that if you hover over rust-analyzer theres an option 
+to "rebuild build dependencies" and that fixes the errors that don't resolve 
+normally.
+
+What I'm wondering is how I can get expressions, blocks, etc, out of the token stream
+in a structured way like I can with macro_rules. 
+
+Reading the docs for the parse_macro_input! macro provided by syn led me 
+to the following example. 
+<CodeSnippet>
+```rust
+
+    use proc_macro::TokenStream;
+    use syn::{parse_macro_input, Result};
+    use syn::parse::{Parse, ParseStream};
+
+    struct MyMacroInput {
+        /* ... */
+    }
+
+    impl Parse for MyMacroInput {
+        fn parse(input: ParseStream) -> Result<Self> {
+            /* ... */
+        }
+    }
+
+    #[proc_macro]
+    pub fn my_macro(tokens: TokenStream) -> TokenStream {
+        let input = parse_macro_input!(tokens as MyMacroInput);
+
+        /* ... */
+    }
+```
+</CodeSnippet>
+
+It seems like the intent is for the library consumer to use the types in 
+syn to define their expected input, then implement parse for that. 
+
+Lets read up on parse. 
+
+# Parse
+
+So it seems like each type in syn - almost anyway - implements the parse trait, 
+which has the parse method. ParseStream also has a parse method but not from the trait.
+
+Instead, the one on ParseStream is 
+
+<CodeSnippet>
+```rust
+    pub fn parse<T: Parse>(&self) -> Result<T> {
+        T::parse(self)
+    }
+```
+</CodeSnippet>
+
+So it just uses the one from whatever you're trying to parse from it. 
+It also says that it advances the internal buffer even though it takes 
+a & instead of &mut, so it should be fine to use it successively to take 
+the things we want from the parse stream. 
+
+The caveat seems to be that leaving the input token stream not-fully-read 
+constitutes an error in the macro, so the way the syn crate demonstrated 
+earlier is probably best. 
+
+# FINALLY
+OK, it was arduous, and definitely would've been easier in a macro_rules,
+but at long last I built a thing that should take every literal or ident in 
+an expression and cast them to a type before operating on them all. 
+
+<CodeSnippet>
+```rust
+    struct EvalInput
+    {
+        comp : Vec<OpOrLit>,
+        comma : Token!(,),
+        ty : syn::Type
+    }
+
+    enum OpOrLit
+    {
+        BOp(syn::BinOp),
+        UOp(syn::UnOp),
+        LitF(syn::LitFloat),
+        LitI(syn::LitInt),
+        ID(syn::Ident)
+    }
+
+
+    impl Parse for OpOrLit
+    {
+        fn parse(input: ParseStream) -> Result<Self>
+        {
+            if Ok(res)=input.parse<syn::BinOp>()        {Ok(OpOrLit::BOp(res))}
+            else if Ok(res)=input.parse<syn::UnOp>()    {Ok(OpOrLit::UOp(res))}
+            else if Ok(res)=input.parse<syn::LitFloat>(){Ok(OpOrLit::LitF(res))}
+            else if Ok(res)=input.parse<syn::LitInt>()  {Ok(OpOrLit::LitI(res))}
+            else if Ok(res)=input.parse<syn::Ident>()   {Ok(OpOrLit::ID(res))}
+            else {Err("Fuck")}
+        }
+    }
+
+    impl Parse for EvalInput
+    {
+        fn parse(input:ParseStream) -> Result<Self>
+        {
+            let terms = vec![];
+            while let Ok(op_or_lit) = OpOrLit::parse(input) {terms.push(op_or_lit);}
+
+            return EvalInput{ comp: terms, 
+                            comma: input.parse<Token!(,)>()?, 
+                            ty: input.parse<syn::Type>()?};
+        }
+    }
+
+    #[proc_macro]
+    pub fn eval_as(tokens: TokenStream) -> TokenStream 
+    {
+        let mut input = parse_macro_input!(tokens as EvalInput);
+        let mut output = quote!{};
+        let ty = input.ty;
+        for term in input.comp
+        {
+            let o = match term{
+                OpOrLit::LitF(x) => quote!{#x as #ty},
+                OpOrLit::LitI(x) => quote!{#x as #ty},
+                OpOrLit::ID(x) => quote!{#x as #ty},
+                x => quote!{#x}
+            };
+            output = quote!{#output #o};
+        }
+        return output.into();
+    }
+```
+</CodeSnippet>
+
+Now to just go over to macros and write a test and run it... 
+
+<CodeSnippet>
+```rust
+    let q = 42i64;
+    let no_as = eval_as!(33usize + 4.1f64 + 7.1u8 , f64);
+    println!("{:?}" no_as);
+
+    ///error: could not compile `proc-macros` (lib) due to 29 previous errors; 2 warnings emitted
+```
+</CodeSnippet>
+
+Goddamnit. 
+
+Ok, it took a while but it was mostly syntax errors. My linting is apparently 
+not working in the proc macro crate so I was copy pasting mistakes blindly. 
+
+There's one last error though thats got me a bit stuck. 
+
+<CodeSnippet>
+```
+    error: leading `+` is not supported
+    --> src/main.rs:35:43
+    |
+    35 |     let no_as = eval_as!(33usize + 4.1f64 + 7u8 , f64);
+    |                                              ^ unexpected `+`
+```
+</CodeSnippet>
+                                  
+I think since the structure is a tree internally, it doesn't like being read 
+like a queue. The remaining +7u8 isnt valid syntax on its own so the parser is acting 
+up. 
+
+I worked on this a little longer, it's definitely possible to go through 
+and recursively match your way down with Binary Expressions, Unary Expressions,
+Paths (idents basically), funtion expressions, etc. but it seems ... not worth it. 
+
+I'm retiring from my life of crime. 
+
+# Other Tidbits From The Little Book Of Macros 
+- proc_macros2 isnt a successor, its just a proc_macro crate that can be used outside of crates with proc_macro set in cargo.toml.
+- syn can parse non-rust syntax with the generic parsing api 
+- macro use isnt necessary for external crates but is for other modules in the same crate
+One last thing before we call it a day.
+- proc macros are unhygenic - they just dump their contents where theyre invoked, so make sure not to name anything they generate something indistinct.
+
+# Crab Time
+
+I was prepared to be much more excited about this crate.  
+After banging my head on this for a few hours, I still think its cool,  
+but the proper way to do macros in rust as far as I care is with syn and quote. 
+
+Which you can use with crabtime! 
+
+I managed to finish the eval_as macro using it, but in a very unsafe way.
+
+<CodeSnippet>
+```rust
+    #[crabtime::expression]
+    fn eval_as(pattern!($l:literal): _)
+    {
+        let mut input = stringify!($l);
+        //strip leading and trailing quotes 
+        assert!(input.len()>2, "input too short");
+        input = &input[1..input.len()-1];
+        //expecting input like eval_as!(f32, x+y+33/2.0);
+        let ops = ["%","*","+","-","/"];
+        let parts : Vec<&str> = input.split(",").collect();
+        assert_eq!(parts.len(), 2, "Input should be 'type,expr'");
+        let ty = parts[0];
+        let mut mout = parts[1].to_string();
+        ops.iter().for_each(|op| mout = mout.replace(op, &format!(" as {} {} ", ty, op))); 
+        crabtime::output!{ {{mout}} as {{ty}} }
+    }
+
+    //in main
+    let q = eval_as!("f32, 43 + 54.0f64/32f32 - 8u8 + 5");
+    println!("{}",q);
+
+    //output
+    41.6875
+```
+</CodeSnippet>
+
+Who needs input pattern matching or type safety anywho, what are you programming in anyway?
+
+Aside from derive macros I could see this being really useful, but I wouldn't do them like I 
+did eval_as in any real project. 
+
+# Conclusion
+
+Thank you for enduring this ordeal with me, despite how tired I am after spending at least 
+16 hours learning all this and writing it up, I'm glad I did it. 
+
+I'm not sure that I can entirely attribute it to being diagnosed with ADHD as an adult but my list 
+of 'stuff i want to do' really got out of control at some point, like a browser window with 100s of tabs open that 
+I couldn't help but stare at without being able to find the focus or energy to close any of them out.  
+
+I'm sure I'll make use of these examples in the future but for now, I'm closing this tab and going to bed a bit lighter.
+
+
+
+<br/><br/><br/><br/><br/><br/><br/><br/><br/><br/><br/><br/><br/><br/><br/><br/><br/><br/><br/><br/><br/><br/>
+
+
+
+
+
+<ArticleImage src={Noodle} width="400px" alt="skidaddle skidoodle your dick is now a noodle"/>

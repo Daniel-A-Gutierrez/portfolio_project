@@ -73,3 +73,5 @@ Typescript Macros
 
 ## 11/10/25
 Captcha ideas - word associations, svg coloring, rhythm game
+
+Want to make a big or customizeable details header thing but ugh formatting this articles a pain and its still a lot of work left to be done...

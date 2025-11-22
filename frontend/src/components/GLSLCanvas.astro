@@ -1,0 +1,14 @@
+---
+import { z } from 'astro:content';
+import fs from 'node:fs';
+import ShaderCanvas from '/src/components/ShaderCanvas.svelte';
+export interface Props {
+    src: string,
+}
+let {src, ...rest} = Astro.props;
+//have to jump through the hoop to load files at build time
+const shader = (await fs.promises.readFile(src)).toString('utf-8');
+
+---
+
+<ShaderCanvas client:load shader={shader} {...rest}/>

@@ -15,8 +15,10 @@ const posts = await getCollection('blog');
 			<p>Personal Website of Daniel Gutierrez</p>
 		</div>
 		{ 
-			posts.sort( (a,b) => {return b.data.postnum - a.data.postnum} )
-			.map( post => 
+			posts.filter(post => !post.data.draft)
+				 .sort( (a,b) => 
+				 	{return Date.parse(b.data.published) - Date.parse(a.data.published)} )
+				 .map( post => 
 			<RedditStylePreview 
 				title={post.data.title} 
 				description={post.data.description}

@@ -60,7 +60,6 @@
         "title",
         "description",
         "preview",
-        "postnum",
         "published"
       ],
       "additionalProperties": false

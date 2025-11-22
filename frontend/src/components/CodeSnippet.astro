@@ -5,6 +5,7 @@ export interface Props
     language : string
 }
 let props = Astro.props;
+
 ---
 
 <div>
@@ -13,6 +14,20 @@ let props = Astro.props;
         <slot/>
     </code>
 </div>
+
+<script>
+let codes = document.querySelectorAll("code.snippet > pre");
+for(let c = 0 ; c < codes.length ; c++)
+{
+    let lines = codes[c].querySelectorAll("code > span");
+    for(let i = 0 ; i < lines.length; i++)
+    {
+        let numberstr = (i+1).toString();
+        let padding = " "+" ".repeat(Math.min(Math.max(3-numberstr.length,0),2));
+        lines[i].setAttribute('style',`--line-number:"${padding}${numberstr}"`);
+    }
+}
+</script>
 
 <style>
     div 
@@ -43,5 +58,11 @@ let props = Astro.props;
         border-radius: 8px;
         background-color: var(--mainbkg) !important;
         padding-bottom: 8px;
+    }
+
+    code.snippet > pre > code > span::before 
+    {
+        color: #ccc8;
+        content: var(--line-number);
     }
 </style>

@@ -10,7 +10,7 @@ const blog = defineCollection({ loader : glob({base : "src/posts", pattern : "*.
         title : z.string(),
         description : z.string(),
         preview : z.string(),
-        postnum : z.number(),
+        postnum : z.number().optional(),
         published : z.string(),
         layout : z.undefined().or(z.string()),
         tags : z.undefined().or(z.array(z.string())),

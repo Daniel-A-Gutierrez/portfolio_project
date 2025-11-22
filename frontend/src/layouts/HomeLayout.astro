@@ -12,11 +12,15 @@ type HomePageFrontmatter = {
     righttext : string
 };
 import Layout from './Layout.astro';
+import GLSLCanvas from '../components/GLSLCanvas.astro';
 const props : Props = Astro.props; //frontmatter = astro.props.frontmatter
 let frontmatter : HomePageFrontmatter | undefined = props?.frontmatter;
 ---
 <Layout title={props.title}>
-<div class="banner"></div>
+<GLSLCanvas src="public/fuji.glsl" class="home-banner"/>
+<div class="credit">
+    <a href="https://www.shadertoy.com/user/kaiware007">kaiware007</a>
+</div>
 <div class="pfp"></div>
 <div class="navigator">
     <a target='_blank' href="https://www.youtube.com/channel/UCDp6SYcFblFx5udgwHe5Shg/featured">Youtube</a>
@@ -38,6 +42,17 @@ let frontmatter : HomePageFrontmatter | undefined = props?.frontmatter;
         color : var(--headertxt);
     }
 
+    :global(.home-banner){
+        height: min(30vh, 300px);
+        z-index: 3;
+    }
+    .credit
+    {
+        position:absolute;
+        top:.75rem;
+        right:.75rem;
+    }
+
     /* :global(p) :global(img)
     {
         max-width: 100%;
@@ -55,13 +70,7 @@ let frontmatter : HomePageFrontmatter | undefined = props?.frontmatter;
         font-size : 1.1em;
     }
 
-    .banner
-    {
-        height: min(50vh, 400px);
-        background : url('images/night sky v5.png'); 
-        background-size: cover;
-        background-position-y: 20%;
-    }
+
     .pfp
     {
         --picsize: 100px;
@@ -72,6 +81,8 @@ let frontmatter : HomePageFrontmatter | undefined = props?.frontmatter;
         background-image: url('images/me portrait.jpg');
         background-position: center;
         background-size: cover;
+        z-index: 100;
+        position:relative;
     }
     .navigator
         {

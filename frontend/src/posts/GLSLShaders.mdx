@@ -1,0 +1,279 @@
+---
+title : "Diving Head-First Into Shaders"
+description : "Always wanted to try this."
+preview : "/previews/mandelbrot.png"
+layout : '../layouts/ArticleLayout.astro'
+published : '11/19/2025'
+tags : ['Shaders']
+draft : false
+---
+
+import CodeSnippet from "/src/components/CodeSnippet.astro";
+import GLSLCanvas from "/src/components/GLSLCanvas.astro";
+import GLSLEditor from "/src/components/GLSLEditor.svelte";
+
+The banner on this website is a bit drab isn't it?  
+Maybe its time I spruced things up a bit. 
+
+# Off To A Great Start \s 
+
+My 'simplest possible' library of choice was glslCanvas, however it doesn't have
+any types or even 3rd party types.  
+There is another library thats basically a port of glslCanvas (and about a decade more recent).
+
+But it cant be imported!
+
+So after following the instructions in the most recent issue (thats been open for 14 months)
+I had to modify the library's package.json [like so](https://github.com/actarian/glsl-canvas/issues/46)
+
+It doesnt seem [that complicated](https://dev.to/hayyanstudio/creating-simple-shaders-in-webgl-a-step-by-step-guide-46gg)
+to just do things from scratch so I'll consider that if the library ends up being more of a pain than it's worth.
+
+# Creating The Canvas 
+(Thanks to this guide)[https://michaelmuratov.com/blog/guides/simple_shader/] I'm 
+not flying in the dark completely, but I do need to adapt things to work within Astro.
+
+Ideally I can leverage it to load my shader from a dedicated shader.glsl file so
+that I can use a VSCode extension like (this)[https://open-vsx.org/vscode/item?itemName=slevesque.shader]
+to make the experience nicer.
+
+After some fruitless faffing about with content collections I wound up with this. 
+
+<CodeSnippet filename="GLSLCanvas.astro">
+    ```ts
+        ---
+        import { z } from 'astro:content';
+        import fs from 'node:fs';
+        import ShaderCanvas from '/src/components/ShaderCanvas.svelte';
+        export interface Props {
+            src: string,
+        }
+        let {src, ...rest} = Astro.props;
+        //loading shaders at build time
+        const shader = (await fs.promises.readFile(src)).toString('utf-8');
+
+        ---
+
+        <ShaderCanvas client:load shader={shader} {...rest}/>
+    ```
+</CodeSnippet>
+
+<CodeSnippet filename="ShaderCanvas.svelte">
+    ```svelte
+        <script lang="ts">
+            export interface Props {shader:string};
+            import {Canvas} from 'glsl-canvas-js';
+            import {ContextMode} from 'glsl-canvas-js/dist/cjs/context/context';
+            import {onMount} from 'svelte'; 
+            let {shader, ...rest} : Props = $props();
+            let canvas : HTMLCanvasElement;
+            onMount( () => run() );
+            function run() 
+            {
+                const glsl = new Canvas(canvas, {
+                    alpha: false,
+                    antialias: true,
+                    mode: ContextMode.Flat,
+                    extensions: ["EXT_shader_texture_lod"]
+                });
+                glsl.load(shader);
+            }
+        </script>
+
+        <canvas bind:this={canvas} {...rest}></canvas>
+    ```
+</CodeSnippet>
+
+<CodeSnippet filename="SinLight.glsl">
+    ```glsl
+        #ifdef GL_ES
+        precision mediump float;
+        #endif
+
+        #define iTime u_time
+        #define iResolution vec3(u_resolution, 1.0)
+
+        uniform float u_time;
+        uniform vec2 u_resolution;
+
+        #define PI 3.14159
+        #define e  2.71828
+
+        void mainImage( out vec4 fragColor, in vec2 fragCoord )
+        {
+            vec2 uv  = (fragCoord-0.5*iResolution.xy)/iResolution.y;
+            fragColor = vec4((sin(u_time)-length(uv)) * (sin(u_time)));
+        }
+
+        void main() {
+            vec4 color = vec4(0.0);
+            mainImage(color, gl_FragCoord.xy);
+            gl_FragColor = color;
+        }
+    ```
+</CodeSnippet>
+<GLSLCanvas src="public/shader.glsl" class="centered" width="400" height="400"/>
+
+That was surprisingly easy to get running, actually. Yay!
+
+There's documentation for all the functions available in glsl [here](https://docs.vulkan.org/glsl/latest/chapters/builtinfunctions.html#_length)
+and a pretty good guide in [The Book Of Shaders.](https://thebookofshaders.com/01/)
+One thing first - 
+
+## Shadertoy To GLSL Canvas 
+Also the blog I mentioned earlier actually showed how to make shaders from shadertoy work 
+in glslCanvas, lets see how easy it is to copy one over.
+
+I was thinking of using [this awesome cyber fuji shader](https://www.shadertoy.com/view/Wt33Wf) for the banner of my website, lets
+start by just copy pasting it over the 'mainImage' function in my previous shader.
+
+<GLSLCanvas src="public/fuji.glsl" class="centered" width="1000" height="400" style="max-width:100%"/>
+<div><small>[kaiware007](https://www.shadertoy.com/user/kaiware007)</small></div>
+
+Holy cow it's actually that easy.
+
+Actually I like the interactive sandbox in that book, it seems both it and shadertoy use
+code mirror... actually nevermind, the guy who wrote this made the shader editor component 
+into a library called [glslEditor](https://github.com/patriciogonzalezvivo/glslEditor).  
+What a legend. 
+
+<GLSLEditor client:only uid="glsl-editor"/>
+
+That actually wasn't exactly simple to get into the project.
+I ended up linking to the jsDeliver CDN from the head of my project instead of using
+the npm package because the npm package was complaining that it couldn't find electron? 
+
+And after that I had to do some work on the styles and some js to make the canvas 
+appear to the side of the editor properly and make it responsive. I think the final result
+is good though. Here's the code
+
+<CodeSnippet filename="GLSLEditor.svelte">
+``` svelte
+    <script>
+        import {onMount} from "svelte";
+
+        let {uid,...rest} = $props();
+
+        let container;
+        const mobileBreakpoint = 576;
+
+
+        function calcResponsiveWidth()
+        {
+            if(container == null){return}
+            let w = Math.min(window.innerWidth, container.offsetWidth);
+            return w < mobileBreakpoint ? container.offsetWidth : container.offsetWidth / 2;
+        }
+
+        onMount( () => {
+
+            let glslEditor = new GlslEditor(`#${uid}`, { 
+                canvas_size: calcResponsiveWidth(),
+                canvas_draggable: false,
+                theme: 'monokai',
+                multipleBuffers: false,
+                watchHash: true,
+                fileDrops: true,
+                menu: false,
+                lineWrapping: false
+            });
+            console.log(glslEditor);
+            let resizer = window.addEventListener('resize', () => {
+                let w = calcResponsiveWidth();
+                glslEditor.shader.canvas.canvas.style="background-color:rgb(1,1,1);";
+                glslEditor.shader.canvas.canvas.width=w;
+                //glslEditor.shader.canvas.canvas.height=w;
+            });
+            return () => {window.removeEventListener('resize',resizer)};
+        });
+    </script>
+
+    <div id={uid} bind:this={container} class="glsl-editor-container" {...rest}></div>
+
+    <style define:vars={{uid}}>
+        :global{
+            .glsl-editor-container{
+                display:flex;
+                flex-direction: column;
+            }
+
+            .glsl-editor-container > .ge_editor {
+                width: 100%;
+                order:2;
+            }
+            
+            .glsl-editor-container > .ge_canvas_container 
+            {
+                display:block;
+                width: 100%;
+                position:unset;
+                order:1;
+            }
+            .glsl-editor-container > .ge_canvas_container > canvas 
+            {
+                display:block;
+                margin-left:auto;
+                margin-right:auto;
+            }
+            @media (min-width:576px) {
+                .glsl-editor-container > .ge_canvas_container 
+                {
+                    order:2;
+                    width: 50%;
+                }
+                .glsl-editor-container{
+                    flex-direction: row;
+                }
+                .glsl-editor-container > .ge_editor {
+                    order: 1;
+                    width: 50%;
+                }
+                .glsl-editor-container > .ge_canvas_container > canvas 
+                {
+                    margin-left:unset;
+                    margin-right:unset;
+                }
+            }
+        }
+    </style>
+```
+</CodeSnippet>
+
+This whole thing also made me want to add line numbers to my Code Snippet component,
+which ended up being pretty easy. Just have each line's ::before render content as a variable,
+then use js to set that variable on each line, and pad things to look nice.
+
+<CodeSnippet filename="CodeSnippet.astro">
+```ts 
+    <script>
+    let codes = document.querySelectorAll("code.snippet > pre");
+    for(let c = 0 ; c < codes.length ; c++)
+    {
+        let lines = codes[c].querySelectorAll("code > span");
+        for(let i = 0 ; i < lines.length; i++)
+        {
+            let numberstr = (i+1).toString();
+            let padding = " "+" ".repeat(Math.min(Math.max(3-numberstr.length,0),2));
+            lines[i].setAttribute('style',`--line-number:"${padding}${numberstr}"`);
+        }
+    }
+    </script>
+
+    <style>
+        code.snippet > pre > code > span::before 
+        {
+            color: #ccc8;
+            content: var(--line-number);
+        }
+    </style>
+
+```
+</CodeSnippet>
+
+# Conclusion
+
+I think this has been a good starting point for my shaders journey, I have all 
+the tools I need set up and running and I'm pretty confident I can employ this 
+to make my website's banner now, which was honestly my main goal. 
+
+Once I find more interesting stuff in the world of shaders to write about, I'll follow this article up.

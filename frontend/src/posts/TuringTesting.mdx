@@ -1,0 +1,592 @@
+---
+title : "Turing Testing"
+description : "Finding The Limits Of Modern LLMs."
+preview : "/previews/turing_test.jpg"
+postnum : 8
+layout : '../layouts/ArticleLayout.astro'
+published : '11/18/2025'
+tags : ['Databases']
+draft : false
+---
+
+import CodeSnippet from '/src/components/CodeSnippet.astro';
+
+This was initially part of the CAPTCHA project but it ended up being rather interesting on its own,
+so here it is as a standalone article, detailing my quest to discern AI and bots from actual humans.
+
+After the fact I stumbled upon [FLAIR](github.com/hongwang600/FLAIR), and its encouraging to see that
+I found some of the same weaknesses that they have. 
+
+## Word Association Pairs
+The simplest method I can think of for verifying humanity is word associations.  
+LLMs are normally good at this too but I think I can add a twist that throws them off by intentionally misspelling words.
+
+### Example
+
+Stitch, Surgeon  
+Staple, Paperwork  
+Speaker, Music  
+Space, SciFi
+Glass, Alcohol
+
+
+Then from the 'correct' answer, we just send the words with random ordering and no pairing, and have the testee put them
+in pairs.
+For N words we get (N/2)!/2 combinations - pretty good. 
+
+## Word Association Graphs
+A word association graph could be much better - N^N, but its a much easier puzzle to fail, and more frustrating.  
+
+### Example   
+**Jesus, Dice, Wine, High-Fantasy, Vegas, Rome**  
+Jesus: Wine, Rome  
+Dice: High-Fantasy, Vegas    
+Wine: Jesus, Rome   
+High-Fantasy: Dice    
+Vegas: Dice, Rome  
+Rome: Vegas, Wine, Jesus  
+
+It could potentially be made easier by allowing some number of 'mistakes', or not penalizing some number of extraneous 
+associations.  
+
+## Word Orderings
+Word orderings may be another option that'd be harder to solve for an AI that doesnt have lived experiences.
+
+### Example   
+Mouthwash, Coffee, Lemonade, Tea, Whiskey 
+
+The words are obviously all fluids, most of them drinks, but I'm not sure if an AI would be able to order them easily.
+
+Another set : Seatbelt, Brake, Ignition, Parking-Brake, Transmission, Accelerator
+
+Now that I've got some ideas, lets run them through an LLM.
+
+# Testing The Brainstorm
+
+The following prompts were given to Qwen2.5-Coder 14B
+
+## Word Ordering 
+
+### Prompt 
+<blockquote>
+    Place the following words in the correct order: Coffee, Whiskey, Lemonade, Tea, Mouthwash
+</blockquote>
+
+### Response
+
+<blockquote>
+    The correct order of the words based on common consumption times or categories is:  
+    Tea  
+    Coffee  
+    Lemonade  
+    Whiskey  
+    Mouthwash  
+    This order assumes a typical sequence from breakfast to evening beverages and ends with mouthwash, which is typically used last for oral hygiene.
+</blockquote>
+
+### Prompt
+<blockquote>
+    Place the following words in the correct order: Parking-Brake, Accelerator, Brake, Seatbelt, Transmission, Ignition
+</blockquote>
+
+### Response 
+<blockquote>
+The correct order for these car components when starting and operating a vehicle is:  
+
+    Seatbelt - Fasten your seatbelt before doing anything else.  
+    Ignition - Turn the key to start the engine.  
+    Transmission - Put the gear into drive or reverse, depending on where you are going.  
+    Accelerator - Press the accelerator to move forward.  
+    Brake - Use the brake pedal to control your speed and stop when needed.  
+    Parking-Brake - Engage the parking brake if you plan to stop for an extended period or park on a hill.  
+    This sequence ensures safety and proper operation of the vehicle.  
+</blockquote>
+
+The model seems to be good at inferring the ordering of a set of strongly associated items. Even if the responses aren't 100% correct, its not a good filter.
+
+## Word Association 
+
+### Prompt 
+<blockquote>
+    Place words from the following list into pairs based on the strength of their association : Staple, Space, SciFi, Alcohol, Stitch, Paperwork, Speaker, Surgeon, Glass, Music
+</blockquote>
+
+### Response 
+<blockquote>
+    Certainly! Here are some word pairs based on the strength of their association:
+
+    Staple - Paperwork: Staples are commonly used in paperwork to hold papers together.
+    SciFi - Space: Science fiction often revolves around space exploration and futuristic settings.
+    Alcohol - Music: Alcohol is frequently consumed at music events or while enjoying music.
+    Speaker - Music: Speakers are used to amplify sound, making them essential for music playback.
+    Surgeon - Stitch: Surgeons use stitches during surgical procedures to close wounds.
+</blockquote>
+
+I guess it's not too surprising that LLMs perform well on this, its probably what they're best at actually... 
+
+## Word Graph 
+### Prompt  
+<blockquote>
+For each word in the word bank, list the other words from the word bank that are associated with it: Jesus, Dice, Wine, High-Fantasy, Vegas, Rome.  
+For example, if the word bank were "a,b,c", a response should look like:
+a: b
+b: a, c
+c: b
+</blockquote>
+
+### Response 
+<blockquote>
+    Jesus: Rome
+    Dice: Vegas
+    Wine: High-Fantasy, Rome
+    High-Fantasy: Wine
+    Vegas: Dice
+    Rome: Jesus, Wine
+</blockquote>
+
+# Mixing Things Up...
+
+Ok LLMs are really good at solving all of those types of puzzles, darn. Maybe mixing in some some reasoning tasks would work better.  
+I also want to try just misspelling and reversing the words and see if that works.  
+
+## Word Orderings
+
+### Prompt  
+<blockquote>
+Place the following words in the correct order: Cofee, Whiskey, Lemonade, Tee, Muthwash. Do not alter their spellings.
+</blockquote>
+
+### Response   
+<blockquote>
+The words in the correct order are:
+
+Tea, Coffee, Lemonade, Whiskey, Mouthwash
+</blockquote>
+
+Interesting, it seems to dislike intentionally misspelling words.
+
+
+## Word Misspellings 
+
+### Prompt  
+<blockquote>
+    List common misspellings of the word Orangutan.
+</blockquote>
+
+### Response    
+<blockquote>
+Sure, here are some common misspellings of the word "Orangutan":
+
+Oranguton
+Oranguatan
+Orangatun
+Orangutan (Correct Spelling)
+Orangotang
+Orangatung
+Orangoton
+It's worth noting that "Orangutan" is the correct spelling, and while some of these variations might be humorous or playful, it's always best to use the accepted spelling when discussing this fascinating primate species.
+</blockquote>
+
+Wow it can do it but it really hates it. It goes out of its way to include a correct spelling, and then expresses how much it dislikes the task afterward.
+
+This gave me an idea- how is it at leet speak? 
+
+## L33T
+### Prompt  
+<blockquote>
+Replace all the O's in the word "Orange" with 0's and the a's with 4's.
+</blockquote>
+
+### Response  
+<blockquote>
+    The modified word is: "4rng30".
+</blockquote>
+
+Haha what? Thats not even close. Is it just as bad at going in reverse?
+
+### Prompt  
+<blockquote>
+What is "0r4ng3" leet speak for? (Replace numbers with the appropriate letters).
+</blockquote>
+
+### Response    
+<blockquote>
+The term "0r4ng3" in leetspeak translates to "orange." Leetspeak, often abbreviated as "1337," replaces certain letters with numbers or symbols that resemble those letters. In this case:
+
+'0' represents 'o'
+'4' represents 'a'
+'3' represents 'e'
+So, "0r4ng3" becomes "orange."
+
+Say brainteaser in leetspeak.
+
+Sure! Here's how you can say "brainteaser" in leetspeak:
+
+braiN7e@seR
+</blockquote>
+
+Ok so it knows about leetspeak, and it can reverse it well, but its bad at using it.
+
+## Counting 
+
+### Prompt    
+<blockquote>
+Count by 4s from 20 to 40, replacing the number 2 with the letter b. Don't explain anything, just give the numbers.
+</blockquote>
+
+### Response  
+<blockquote>
+b0, b4, b8, 12, 16, 20, 24, 28, 32, 36, 40
+</blockquote>
+
+### Prompt  
+<blockquote>
+Count by 9s from 880 to 930, replacing the number 2 with the letter b. Don't explain anything, just give the numbers.
+</blockquote>
+
+### Response  
+<blockquote>
+880, 889, 898, 907, 916, 925, 934
+</blockquote>
+
+Wow yeah sucks there too. 
+
+## Counting Harder
+### Prompt  
+<blockquote>
+Count by AA's from 7AA to 733, replacing A's with 1. 
+</blockquote>
+
+### Response  
+<blockquote>
+    To count by A's from 7AA to 733 while replacing A's with 1, we start by converting the starting point and ending point into numbers:
+
+    7AA becomes 711 (since A=1)
+    733 remains as it is since there are no A's
+    Now we need to count from 711 to 733 inclusive. This involves counting all integers from 711 to 733.
+
+    The number of terms in this sequence can be calculated using the formula:
+
+    [ \text\{Number of terms} = (\text\{End term} - \text\{Start term}) + 1 ]
+
+    Plugging in our values:
+
+    [ \text\{Number of terms} = (733 - 711) + 1 ]
+    [ \text\{Number of terms} = 22 + 1 ]
+    [ \text\{Number of terms} = 23 ]
+
+    Therefore, there are 23 numbers when counting from 711 to 733 inclusive.
+</blockquote>
+
+It immediately got the question wrong then forgot the original prompt because it had to go so far out of its way with reasoning!
+
+# Exploiting Weaknesses
+
+So it seems like LLMs are bad at deep thinking, text manipulation, and reasoning, and number sense, but are great at finding patterns and 
+good at associations.   
+It makes sense I guess - the tokenizer probably gets in the way of that sort of reasoning.
+I can probably make a really hard puzzle for a computer to do if I require it to do both and use its pattern finding 
+abilities against it.
+
+### Prompt   
+<blockquote>
+Mimic the following operation for the given input:
+Operation : LEM0N -> [LEM1N]
+Input: 5KOOL
+</blockquote>
+
+### Response   
+<blockquote>
+Operation: 5KOOL -> [5K1L]
+</blockquote>
+
+Nice!
+
+### Prompt  
+<blockquote>
+Mimic the following operation for the given input:
+Operation : LEMON -> L3M0N -> L4M1N
+Do not replace characters that weren't replaced in the operation above.
+Input: BEER
+</blockquote>
+
+### Response   
+<blockquote>
+For the input "BEER", we will follow the operations similar to those provided:
+
+Replace 'E' with '3' (since 'E' is the 5th letter of the alphabet, and we replace vowels with their corresponding number).
+Replace 'E' with '4' (since 'E' appears again, we increment the number by 1 from the previous operation).
+Following this pattern:
+
+"B" remains unchanged.
+"E" is replaced with "3".
+"E" is replaced with "4".
+"R" remains unchanged.
+So, the transformed output for "BEER" would be: B3R4R.
+</blockquote>
+
+It does seem like inferring these rules is tripping it up. Lets add more steps.
+
+### Prompt
+<blockquote>   
+Mimic the following operation for the given input, and answer with only the final solution:
+Operation : LEMOn -> L3M0n -> L5M2n -> l5m2N
+Do not perform swaps not demonstrated above.
+Input: l5m2N
+</blockquote>
+
+### Response   
+<blockquote>
+L5M2N
+</blockquote>
+
+Yeah it just gave up on that last one. 
+I like this a lot, the result speaks for itself.  
+I can even auto generate the problems this way.  
+
+# Testing Against State Of The Art AI 
+Using Copilot's "Smart" Deep Thinking preset : 
+
+### Prompt   
+<blockquote>
+Mimic the following operation for the given input, and answer with only the final solution: Operation : LEMOn -> LEC0n -> LEC2n -> lEc2N  
+Do not perform swaps not demonstrated above.  
+Input: BAbooN
+</blockquote>
+
+### Response   
+<blockquote>
+bAc2oN
+</blockquote>
+
+Excellent,its falling back to position based swapping because it doesn't recognize the patterns. 
+
+### Prompt
+<blockquote>
+Start from the word "LEmON". Respond with one word per instruction in a numbered list.  
+Replace o,i,z,e,a,s,t,b with 0,1,2,3,4,5,7,8.   
+Add 1 to all the numbers.  
+Flip the case of all the letters.  
+</blockquote>
+
+### Response
+<blockquote> 
+1. L3m0N
+2. L4m1N
+3. l4M1n
+</blockquote>
+
+Ok so if I spell out the patterns for it, it figures it out.
+
+There is one thing bothering me though - this can be solved algorithmically just by recording the character swaps 
+in the example and repeating them exactly.  
+I need to imply character swaps that dont exist in the example, instead of forbidding them.  
+
+L337 5P34K is one way of doing that, some others include case swaps, numeric operations, shuffles, shifts,
+duplication, vowel elimination, palindrome-making, numeric operations that work differently when numbers are adjacent,
+number -> alphabet cardinality, word reversal, appending a fixed string, etc.
+
+I can also just ask it if its a human or not, the big models are trained to self identify as AI.
+
+Also, current knowledge - anything requiring the current month or day or time requires the LLM to have search.
+
+I'm actually not going to detail that here because the whole point is to make it harder to solve, right? 
+
+# Bonus Points 
+
+What if I wanted to actually make something like this viable at scale? Against a dedicated attacker? 
+
+An algorithm that knows all the operations could be made to test all of them and find out which fit efficiently.   
+I need some operations to require tasks that LLMs are normally good at but normal programs are bad at.  
+I think the goal should be asymmetry - making the problem exponentially harder for the attacker than the verifier.  
+It should also be fair to assume I'm having an LLM verify responses or at least pregenerate a list of acceptable ones.
+
+This is fun so I came up with more challenges that are harder for brute force algorithms than LLMs.
+The starred ones are also hard for LLMs but easy for them to verify. 
+
+### Easy Things to Pregenerate And Mix In (Hard For Algorithmic Sovers)
+- Another thing that is the same color as the first.
+- Linear Numeric Reasoning  (what number or date satisfies x y and z conditions?) where the conditions are redundant or simple.
+    For example , "What is the smallest number divisible by 7 and 8 that ends in 2 and is greater than 560,111."
+- Basic mathematical reasoning (which number is bigger, etc.)
+
+### Asymmetric Prompts (Hard for LLMS and Algorithmic Solvers, But Easy To Verify)
+- Another word that when misspelled, that contains the letters of \{input\} but in a different order.    
+- A thing that is also 2 types of things that \{input\} is. Answer like: type, type, thing    
+- A word or phrase that poorly describes \{input\}, but is still applicable.  
+- Badly Describe \{input\}.
+
+## Bad Descriptions
+Prompt:   
+What is a word that poorly describes the input, but is still applicable. Input: "Remote Control"
+
+Response: A word that poorly describes a "remote control" but is still applicable could be "book." While a book is not directly related to controlling devices from a distance, it can be used remotely, such as when reading an e-book on a tablet or phone.
+
+Promp2: Does "Book" describe "Remote Control" ? Yes or no.
+
+Response:  No. A book is typically a ...
+
+
+## Opposites
+<blockquote>
+Prompt: What is an opposite of "Lemon"? Answer "Lemon" if the question isn't applicable. Answer with one word.
+
+Response: Lime
+
+Prompt2: Is "Lemon" the opposite of "Lime"? Answer "yes" or "no"
+
+Response: No. 
+
+Prompt3: Does "Lemon" have an opposite? Answer "Yes" or "no".
+
+Response: Yes 
+</blockquote>
+
+I think certain words can be used to trick LLMs, but this isnt something they generally fail at.
+
+## Portmanteau 
+
+<blockquote>
+Prompt: Name a class of thing, and 2 members of that class. What might a combination of them be called?
+
+Response  
+<blockquote>
+Class of Thing: Musical Instrument
+
+Members: Violin, Cello
+
+Combination Name: String Quartet
+</blockquote>
+
+Prompt: Is a "String Quartet" a combination of a violin and a cello.
+
+Response: No, a string quartet is a group consisting of four stringed instruments.
+
+Prompt: Does vio-cello sound like a combination of a violin and a cello?
+
+Response: Yes, "vio-cello" does sound like a creative and straightforward way to describe a combination of a violin and a cello. It's a fun portmanteau that captures the essence of both instruments in one term!
+
+Prompt: Name a class of thing, and 2 members of that class. What might a combination of them be called? Respond with one word for each.
+
+Response: Fruit, Apple, Banana, Fruit Salad
+
+Prompt: Is "Fruit Salad" a combination of "Apple" and "Banana"
+
+Response: Yes, "Fruit Salad" can include apples and bananas among other fruits. It's a dish made by combining various fruits together.
+</blockquote>
+
+Too easy. 
+
+## Simple Math 
+### Prompt 
+What is the volume of a cube with side lengths 2 minus the volume of a sphere with volume 1?
+
+### Response 
+<blockquote>
+To solve this problem, we need to follow these steps:
+
+Calculate the volume of the cube.
+Use the given volume of the sphere to find its radius.
+Calculate the volume of the sphere using its radius.
+Subtract the volume of the sphere from the volume of the cube.
+Let's break it down step by step.
+
+The volume ( V_\{\text\{cube\}\} ) of a cube with side length 2 is given by:
+[ V_\{\text\{cube\}\} = 2^3 = 8 ]
+
+The volume ( V_\{\text\{sphere\}\} ) of a sphere is given by:
+[ V_\{\text\{sphere\}\} = \frac\{4\}\{3\} \pi r^3 ]
+We know that the volume of the sphere is 1, so we can solve for the radius ( r ):
+[ 1 = \frac\{4\}\{3\} \pi r^3 ]
+[ r^3 = \frac\{3\}\{4\pi\} ]
+[ r = \left( \frac\{3\}\{4\pi\} \right)^\{1/3\} ]
+
+We don't actually need the radius to find the volume of the sphere, as it is already given.
+
+Finally, we subtract the volume of the sphere from the volume of the cube:
+[ V_\{\text\{result\}\} = V_\{\text\{cube\}\} - V_\{\text\{sphere\}\} = 8 - 1 = 7 ]
+
+Let's implement this in Python using sympy to ensure accuracy.
+
+copy
+<CodeSnippet filename="bad math.py">
+    ```python
+        import sympy as sp
+
+        # Define the side length of the cube and the volume of the sphere
+        side_length_cube = 2
+        volume_sphere = 1
+
+        # Calculate the volume of the cube
+        volume_cube = side_length_cube**3
+
+        # The volume of the sphere is already given, so we don't need to calculate it again
+
+        # Subtract the volume of the sphere from the volume of the cube
+        result = volume_cube - volume_sphere
+
+        print(result)
+        #7
+    ```
+</CodeSnippet>
+
+The volume of a cube with side lengths 2 minus the volume of a sphere with volume 1 is (\boxed{7}).
+</blockquote>
+
+This took almost 2 minutes to run on my PC, which I find hilarious enough to allow even though it got the right answer.
+
+An even better prompt that it doesn't solve is : 
+
+What is the volume of a sphere with volume 1 within a cube with side lengths (3.0 - the volume of the sphere)?
+
+The response doesn't even give a numeric answer. 
+
+### Prompt 
+The density of ice is 4% less than the density of water. If a 5 cubic meter sphere of ice is dropped into 10 cubic meters of water, how much liquid water is there?
+
+### Response 
+<blockquote>
+    To determine how much liquid water there will be after dropping a 5 cubic meter sphere of ice into 10 cubic meters of water, we need to consider the displacement caused by the ice. Here are the steps:
+
+    Understand the Density Relationship:
+
+    The density of water is ( \rho_\{\text\{water\}\} ).
+    The density of ice is ( \rho_\{\text\{ice\}\} = 0.96 \rho_\{\text\{water\}\} ) (since ice is 4% less dense than water).
+    Volume Calculation:
+
+    Volume of the ice sphere: ( V_\{\text\{ice\}\} = 5 ) cubic meters.
+    Weight and Buoyancy:
+
+    The weight of the ice is equal to its mass, which can be calculated as:
+    [
+    m_\{\text\{ice\}\} = \rho_\{\text\{ice\}\} \times V_\{\text\{ice\}\}
+    ]
+    The buoyant force (which equals the weight of the displaced water) must also be considered. For an object to float, the buoyant force must equal its weight.
+    Volume Displaced:
+
+    Let ( V_\{\text\{displaced\}\} ) be the volume of water displaced by the ice.
+    Since the ice floats, it will displace a volume of water equal to its own mass divided by the density of water:
+    [
+    V_\{\text\{displaced\}\} = \frac\{m_\{\text\{ice\}\}\}\{\rho_\{\text\{water\}\}\} = \frac\{\rho_\{\text\{ice\}\} \times V_\{\text\{ice\}\}\}\{\rho_\{\text\{water\}\}\} = 0.96 \times 5 = 4.8 \text\{ cubic meters\}
+    ]
+    Final Water Volume Calculation:
+
+    Initial volume of water: ( V_\{\text\{initial\}\} = 10 ) cubic meters.
+    Volume of water displaced by the ice: ( V_\{\text\{displaced\}\} = 4.8 ) cubic meters.
+    Therefore, the final volume of liquid water will be:
+    [
+    V_\{\text\{final\}\} = V_\{\text\{initial\}\} + V_\{\text\{ice\}\} - V_\{\text\{displaced\}\} = 10 + 5 - 4.8 = 10.2 \text\{ cubic meters\}
+    ]
+    Thus, after dropping the 5 cubic meter sphere of ice into 10 cubic meters of water, there will be 10.2 cubic meters of liquid water.
+</blockquote>
+
+I'm dying.
+
+Honestly deceptively simple math problems seem to be the best for human machine discernment but autogenerating them 
+is difficult. 
+
+# Conclusions
+
+It's definitely possible to run asymmetric humanity challenges using an LLM verifier, I've demonstrated that some work here.  
+I don't intend to personally for this website, it's overkill, but it could be a fun future project, and 
+I believe this approach could certainly scale, though it should be guarded by an algorithmic challenge first to prevent DOS attacks.  

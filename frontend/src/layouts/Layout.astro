@@ -18,6 +18,9 @@ const { title } = Astro.props;
 		 <script>import flamethrower from 'flamethrower-router';
 			flamethrower({ prefetch: 'visible', log: true, pageTransitions: false });
 		 </script>
+		 <script src="https://cdn.jsdelivr.net/npm/glslEditor@0.0.24/build/glslEditor.min.js"></script>
+		 <link href="https://cdn.jsdelivr.net/npm/glslEditor@0.0.24/build/glslEditor.min.css" rel="stylesheet">
+		 
 	</head>
 	<body transition:animate='none'>
 		<slot />
@@ -26,13 +29,7 @@ const { title } = Astro.props;
 </html>
 
 <style lang="scss" is:global>
-	//reconfig to match pico 
-	// $flexboxgrid-breakpoints: (
-	// 	sm 36rem 37rem,
-	// 	md 48rem 49rem,
-	// 	lg 64rem 65rem,
-	// 	xlg 80rem 81rem,
-	// 	xxl 96rem 97rem )	;
+	//i only want 1 real breakpoint.
 	$mobile-breakpoint: 576px;
 
 
@@ -94,9 +91,8 @@ const { title } = Astro.props;
 			"utilities/reduce-motion": false
 		));
 	
-</style>
+	
 
-<style is:global>
 	:root
 	{
 		--mainbkg :  #222;
@@ -119,6 +115,7 @@ const { title } = Astro.props;
 		--pico-card-sectioning-background-color: #00000000 !important;
 		--pico-background-color: #111 !important;
 		--pico-form-element-background-color: #111 !important;
+		--pico-h1-color: unset !important;
 		/* --pico-primary: #00000000 !important; */
 		/* --pico-primary-background: #00000000 !important; */
 		/* --pico-primary-underline: #00000000 !important;
@@ -128,6 +125,12 @@ const { title } = Astro.props;
 		/* --pico-primary-inverse: #ffffffff !important; */
 	}
 
+	.centered
+	{
+		margin-left: auto;
+		margin-right: auto;
+		display:block;
+	}
 
 
 	html 

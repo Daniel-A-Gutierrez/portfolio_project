@@ -1,18 +1,19 @@
 ---
-title : "MeCaptcha"
+title : "Making A Captcha"
 description : "Because reCAPTCHA would be too easy I guess."
 preview : "/previews/KV Store.jpg"
-postnum : 8
+postnum : 9
 layout : '../layouts/ArticleLayout.astro'
 published : '11/10/2025'
 tags : ['Databases']
-draft : false
+draft : true
 ---
 
 import CodeSnippet from '/src/components/CodeSnippet.astro';
 import PotluckThing from '/src/components/PotluckThing.svelte';
 import facepalm from '/src/images/facepalm.png';
 import ArticleImage from '/src/components/ArticleImage.astro';
+import DetailsHeader from '/src/components/DetailsHeader.astro';
 
 # Dealing with Bots
 Web scrapers gonna scrape, but I want to make sure that the only things touching my API endpoints are humans using 
@@ -21,7 +22,7 @@ I'll probably have a unique hidden session key specifically for testing.
 Id rather make my own, mostly for fun.  
 I don't expect it to stop a dedicated adversary from accessing the API, I just want it to require human effort. If that 
 effort comes in the form of designing a bot specifically to tackle the challenge that counts too.   
-I also want to do it without relying on images.   
+I also want to do it without relying on images or forms of media other than text.   
 
 It should go like this :  
 1. GUI component loads another challenge component into itself from the server randomly on page load. 
@@ -198,7 +199,7 @@ I'll be writing some tests that issue http requests against a running server usi
 Moved the request structs from main.rs to lib.rs so I can access them from tests.rs to make things easy - 
 having strict response types would have been nice. 
 
-
+<CodeSnippet filename="test result">
     ``` 
         running 1 test
         Response { url: "http://127.0.0.1:3334/get_session", status: 405, headers: {"allow": "GET,HEAD", "content-length": "0", "date": "Tue, 11 Nov 2025 02:27:12 GMT"} }
@@ -206,13 +207,13 @@ having strict response types would have been nice.
         thread 'tests::test::e2e' panicked at src/tests.rs:35:26:
         no set cookie header was set
     ```
-
+</CodeSnippet>
 This was a really simple mistake that cost me way too much time. Don't program tired!   
 It should have been "http://127.0.0.1:3334/api/get_session", but even though I messed it up it wasn't a 404 because it was 
 going to the directory server which expects a GET. 
 
 Getting used to reqwest again actually took quite a few mistakes - I'm going to skim over them - moral of the story is 
-to just use tracing on your server. I've skipped it thus far but I'll be implementing it next. 
+to just use tracing on your server to log incoming requests and the server's responses. I've skipped it thus far but I'll be implementing it next. 
 
 <CodeSnippet filename="e2e_tests.rs"> 
     ``` rust 
@@ -287,10 +288,10 @@ to just use tracing on your server. I've skipped it thus far but I'll be impleme
 </CodeSnippet>
 
 I also tore my hair out for a while trying to figure out why the cookies werent working with reqwest - turns out, 
-1. cookies have to be toggled on on the client
-2. I forgot to actually track them on the server in the first place 
+1. Cookies have to be toggled on on the client with cookie_store(true)
+2. I forgot to actually track them on the server in the first place. 
 
-<ArticleImage src={facepalm} height="100" alt="facepalm"/>
+<ArticleImage src={facepalm} width="120px" alt="facepalm" style="background:white"/>
 
 <CodeSnippet filename="main.rs::get_session"> 
     ```rust 
@@ -301,10 +302,46 @@ I also tore my hair out for a while trying to figure out why the cookies werent 
                 jar = jar.add(Cookie::new("session_id", format!("{:X}", new_session)));
                 
                 //was missing
-                state.sessions.insert(new_session); //this is why you dont program tired.
+                state.sessions.insert(new_session); 
                 
                 return Ok((StatusCode::OK, jar));
             ...
         }
     ```
 </CodeSnippet>
+
+# Errors From The Cosmos? 
+I guess *space* took issue with me today because in the midst of 
+writing this blog post images on my site stopped working.  
+
+Locally.  
+
+Here's the error 
+
+<CodeSnippet filename="bug from space?">
+    ```json
+        MissingSharp: Could not find Sharp. Please install Sharp (`sharp`) manually into your project or migrate to another image service.
+            at loadSharp (file:///home/d/Documents/Projects/Web%20Development/portfolio_project/frontend/dist/chunks/sharp_iL1UxhZj.mjs:16:11)
+            ...
+        loc: undefined,
+        title: 'Could not find Sharp.',
+        hint: "See Sharp's installation instructions for more information: https://sharp.pixelplumbing.com/install. If you are not relying on `astro:assets` to optimize, transform, or process any images, you can configure a passthrough image service instead of installing Sharp. See https://docs.astro.build/en/reference/errors/missing-sharp for more information.\n" +
+            '\n' +
+            'See https://docs.astro.build/en/guides/images/#default-image-service for more information on how to migrate to another image service.',
+        frame: undefined,
+        type: 'AstroError'
+    ```
+</CodeSnippet>
+The thing is, sharp is already a dependency.  
+I hadnt even touched my frontend's dependencies lately but thanks to some cosmic ray or some bizzare side effect of writing this post, I had to debug this now.
+- Uninstalling it and reinstalling didnt work 
+- Deleting node modules and reinstalling didnt work
+- Using a different package manager didnt work 
+
+Ultimately I ended up upgrading yarn from their stable release to the newest one and voila, bug fixed.   
+Who knows if the entropy of the javascript ecosystem just fried some persistent state somewhere or if it really was a cosmic ray flipping some bit on my ssd.  
+
+That was weird.
+
+# Creating The Turing Test
+[I made this part into a standalone article!](/posts/turingtesting)

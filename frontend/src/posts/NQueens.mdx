@@ -1,6 +1,6 @@
 ---
 title : "Brutal N Queens"
-description : "Solving the hardest Rust problem on Code Wars"
+description : "Solving the hardest Rust problem on Code Wars."
 preview : "/previews/nqueens.png"
 postnum : 4
 layout : '../layouts/ArticleLayout.astro'
@@ -9,20 +9,453 @@ tags : ['Machine Learning']
 draft : false
 ---
 
-It was uploaded in 2017 and I was the 13th person in the world solve it in Rust, and 212th for all languages, though around 9400 people have attempted it.  
-The problem is a brutal version of a problem from Machine Learning called N-Queens.  
+import CodeSnippet from '/src/components/CodeSnippet.astro';
+
+
+
+[The Problem](https://www.codewars.com/kata/5985ea20695be6079e000003) was uploaded in 2017 and I was the 13th person in the world solve it in Rust, and 212th for all languages, though around 9400 people had attempted it.  
+The problem is a brutal version of a problem from Machine Learning called N-Queens.   
+
 In the N queens problem your goal is to, given a chess board of dimension N (a normal board is 8x8 so N=8), arrange N queens on the board such that none are
-attacking eachother.
+attacking eachother.  
 
-This challenge was difficult for 3 reasons - 
-- The typical DFS implementation of the solution was only viable for board sizes up to around 28-30, before it just took too much time to complete.
-- The board sizes this problem tests on are up to 1000x1000 (computational difficulty scales exponentially for DFS).
-- Not only does the problem require around 10 different solutions to different boards in the 10 second time limit, the boards can also have no solution.
+Even with a clever algorithm, solving N-Queens is O(N!). 
 
-I was able to solve it due to 4 key innovations
-- I created a genetic algorithm that maintains a population of 'boards' that reproduce based on their fitness - aka the amount of queens under attack.
+The typical DFS implementation of the solution is only viable for board sizes up to around 28-30, before it just takes too much time to complete.  
+
+The board sizes this problem tests on are up to 1000x1000.  
+
+Not only does the problem require around 10 different solutions to different boards in the 10 second time limit, 
+there's a position that must be occupied by a queen, and the boards can also have no solution.
+
+I was able to solve it with 4 key innovations
+- I created a genetic algorithm that maintains a population of 'boards' that reproduce based on their fitness - the amount of queens under attack.
 - The boards prioritize swapping queens that are under attack, and a list of pairs of attacking queens is created optimally while the board is generated.
 - The boards were able to be cloned, mutated, and evaulated extremely efficiently, doing so in a single iteration and without any memory allocations.
 - I realized all unsolvable boards followed a pattern, and automatically failed boards that matched it. 
 
-From there, I just optimized the population size and threw rayon at it, and soon enough I could solve those 1000x1000 boards in milliseconds. The code for my solution is available [here](https://github.com/Daniel-A-Gutierrez/rust_sandbox/blob/master/src/experiments/refactored_nqueens.rs).
+From there, I just optimized the population size and threw rayon at it, and 
+soon enough I could solve those 1000x1000 boards in milliseconds. 
+
+
+<CodeSnippet filename="main.rs">
+```rust
+    use std::cmp;
+    use std::iter::FromIterator;
+    use std::vec;
+    use rand::prelude::*;
+
+    pub fn run() 
+    {
+        //let b = genetic3(15 , (1,2));
+        //println!("\n\n{}",  board2str(&b));
+        //return b.unwrap().queens;
+        solve_n_queens(4, (2,0));
+    }
+
+    pub fn solve_n_queens(n: usize, mandatory_coord: (usize, usize)) -> Option<String> 
+    {
+        if( n==0 ) {return None;}
+        if ( n==1 ) {return Some(String::from("Q\n"));}
+        if (n == 2 || n == 3){return None;}
+        if (n == 4 || n == 6) &&
+        ((mandatory_coord.0 == mandatory_coord.1) || 
+        ((mandatory_coord.0 + mandatory_coord.1) == (n-1)))
+            {return None;}
+        let b = genetic3(n , (mandatory_coord.1, mandatory_coord.0)); //test uses x y semantics instead of row col it seems.
+        return match b
+        {
+            Some(board) => Some(board2str(&board)),
+            None => None
+        };
+        
+    }
+
+    fn genetic3(n : usize, mandatory_coord : (usize,usize)) -> Option<BoardG>
+    {
+        let maxgens = 750usize;
+        let starter_pop = 64usize; //must be at least 2x population + 1
+        let population = 8usize;
+        let mut rng = thread_rng();
+        let mut gen0 = make_boards_G2(n, starter_pop,mandatory_coord); //now uses mandatory coord
+        //let mut gen0 = make_boards_G(n,population*2);
+        //gen0.sort_by(boardcmp);
+        gen0.sort_by(boardcmp);
+        gen0.split_off(population*2);
+
+        //may have just guessed soln
+        if(gen0[0].fitness==0)
+        {
+            return Some(gen0.remove(0));
+        }
+
+        let (mut pop1, mut pop2) = gen0.split_at_mut(population);
+        let mut ore = &mut pop1;
+        let mut waste = &mut pop2;
+        let mut nselection = Vec::<usize>::new();
+        let mut output = make_boards_G2(n,1, mandatory_coord).remove(0);
+        
+        
+        for gen in 0..maxgens
+        {
+            nselection.clear();
+            //setup natural selection - lower indeces favored by rng
+            for i in 0..ore.len()
+            {
+                nselection.push(selector2(i,population,&mut rng));
+            } 
+            
+            waste.iter_mut().enumerate().for_each( |(i,w)| 
+            {
+                reproduce2( &ore[nselection[i]], w);
+                let mut RNG = thread_rng();
+                mutate3(w, 1, &mut RNG, mandatory_coord);
+            });
+            //end parallelized
+
+            //sort the offspring by fitness
+            waste.sort_by(boardcmp);// sort_by(boardcmp);
+
+            //if one is a valid solution, return it
+            if(waste[0].fitness == 0) 
+            {
+                copy_boardG(&waste[0],&mut output);
+                println!("Found in {} generations", &gen);
+                /*if(n<25)
+                    {print_board2(&output.queens.iter().map(|e| Some(*e)).collect(), n);}*/
+                return Some(output);
+            }
+
+            //otherwise swap and run again.
+            let temp = waste;
+            waste = ore;
+            ore = temp;
+        }
+        gen0.sort_by(boardcmp);
+        println!("Solution not found, final fitness : {}", gen0[0].fitness);
+        return None;
+    }
+
+    struct BoardG
+    {
+        fitness : usize,          //number of queens under attack.
+        n : usize,
+        queens : Vec<usize>,    //size 0-n values 0-n
+        columns : Vec<Vec<usize>>,     //size n, initialized to 0
+        diagonals1 : Vec<Vec<usize>>,  //size n*2 , initialized to 0
+        diagonals2 : Vec<Vec<usize>>,
+        attacks : Vec<(usize, usize)> // a flag into columns/diag1,diag2, then the index
+    }
+
+    //makes p unpopulated random boards of size n for the gennetic algo
+    fn make_boards_G2(n:usize, p : usize, mandatory_coord : (usize,usize)) -> Vec<BoardG>
+    {
+        //cant move things out of a vec without removing, gotta remove em
+        let mut rqueens = random_queens2(p,n,mandatory_coord);
+        let mut boards = Vec::<BoardG>::new();
+        for i in (0..p).rev()
+        {
+            boards.push( BoardG{
+                n:n,
+                fitness:0,
+                queens: rqueens.remove(i),
+                columns : vec![ vec![0usize; 0] ;n], //gotta test that
+                diagonals1:vec![vec![0usize; 0];n*2],
+                diagonals2:vec![vec![0usize; 0];n*2],
+                attacks : Vec::<(usize,usize)>::new() //bucket, bucket index. 0 for cols, 1 for diags1, 2 for diags2
+            });
+        }
+        for board in boards.iter_mut()
+        {
+            initialize_boardG(board);
+        }
+
+        return boards;
+    }
+
+    fn boardcmp( a : &BoardG, b: &BoardG) -> std::cmp::Ordering
+    {
+        return a.fitness.cmp(&(b.fitness));
+    }
+
+    fn selector2(i : usize, population : usize, rng: &mut ThreadRng) -> usize
+    {
+        if(i<2){return 0;} //guarantee reproduction of the fittest
+        let r = - rng.gen_range( 0.1 .. f32::log2((population as f32) *2.0) );
+        let o = ((population as f32) * f32::powf(2.0 , r )).floor() as usize;
+        return o;
+    }
+
+    fn reproduce2(parent: & BoardG , child : &mut BoardG)
+    {
+        //no crossing over, just clone, let parent method handle mutation
+        copy_boardG(parent,child);
+    }
+
+    //use 'attacks' to pick rows to swap from
+    fn mutate3(board : &mut BoardG, num_mutations : usize , rng : &mut ThreadRng, mandatory_coord : (usize,usize))
+    {
+        for i in 0..num_mutations
+        {
+            let (mut swap1, mut swap2) = attacked_row_or_rows2(board, rng,mandatory_coord);
+            boardG_swap_rows(board, (swap1,swap2));
+        }
+    }
+
+    //these must now consider the mandatory coordinate.
+    fn attacked_row2(board : &BoardG , rng: &mut ThreadRng, mandatory_coord : (usize,usize)) -> usize
+    {
+        let attacked_index = rng.gen_range(0..board.attacks.len());
+        let (direction, index) = board.attacks[attacked_index];
+        let bucket = match direction
+        {
+            0 => &board.columns, 
+            1 => &board.diagonals1, 
+            2 => &board.diagonals2,
+            _ => panic!("Attack direction indicator wasnt 0, 1, or 2")
+        };
+        let rows = &bucket[index]; //rows involved in the attack
+        //if(rows.len() == 1) {return rows[0];}   //this should never be 1 though
+        let mut rand_index = rng.gen_range(0..rows.len());
+
+        //ensure we don't move our mandatory row. there should always be at least one other option.
+        while rows[rand_index] == mandatory_coord.0 
+        { 
+            rand_index = rng.gen_range(0..rows.len());
+        }
+
+        return rows[rand_index];
+    }
+
+    fn attacked_rows2(board : &BoardG , rng: &mut ThreadRng, mandatory_coord : (usize,usize)) -> (usize,usize)
+    {
+        let row1 = attacked_row2(board, rng, mandatory_coord);
+        let mut row2 = attacked_row2(board, rng, mandatory_coord);
+        if(row1!=row2) {return (row1,row2);}
+
+        let mut c = 0;
+        while(row2 == row1)
+        {
+            row2 = attacked_row2(board,rng,mandatory_coord);
+            c+=1;
+            if(c>64){panic!("cant find a second attacked row!");}
+        }
+        return (row1,row2);
+    }
+
+
+    //get rows currently under attack , or one row under attack and a random other row
+    fn attacked_row_or_rows2(board : &BoardG , rng: &mut ThreadRng, mandatory_coord : (usize,usize)) -> (usize,usize)
+    {
+        if(board.fitness > 3)
+        {
+            return attacked_rows2(board,rng,mandatory_coord);
+        }
+        else 
+        {
+            let a = attacked_row2(board, rng, mandatory_coord);
+            let mut b = rng.gen_range(0..board.n);
+            while a==b || b==mandatory_coord.0 {b = rng.gen_range(0..board.n);}
+            return (a,b);
+        }
+    }
+
+    //mutation : row, from, to
+    fn boardG_swap_rows(board : &mut BoardG, mutation:(usize,usize)) 
+    {
+        let swapfrom = (mutation.0 , board.queens[mutation.0]); //oof , special case where these are equal
+        let swapto = (mutation.1, board.queens[mutation.1]);
+        boardG_remove(board, swapfrom);
+        boardG_remove(board, swapto);
+
+        boardG_add(board, (swapfrom.0, swapto.1));
+        boardG_add(board, (swapto.0, swapfrom.1));
+    }
+
+    //row,col -add a queen to the board 
+    fn boardG_add(board : &mut BoardG, mutation : (usize, usize))
+    {
+        let y = mutation.0 ;
+        let x = mutation.1 ;
+        
+        board.queens[y] = x;
+
+        let x2 = board.n + y - x;
+        let y2 = y + x;
+
+        let mut num_occupants = board.columns[ x ].len();
+        board.fitness += ((num_occupants==1) as usize)*2 + (num_occupants>1) as usize;
+        if(num_occupants==1){board.attacks.push( (0,x) );}
+
+        num_occupants = board.diagonals1[ x2 ].len() ;
+        board.fitness += ((num_occupants==1) as usize)*2 + (num_occupants>1) as usize;
+        if(num_occupants==1){board.attacks.push( (1,x2) );}
+
+        num_occupants = board.diagonals2[ y2 ].len() ;
+        board.fitness += ((num_occupants==1) as usize)*2 + (num_occupants>1) as usize;
+        if(num_occupants==1){board.attacks.push( (2,y2) );}
+
+        
+        //push this rownum to the buckets it falls into. may not need to track columns in future.
+        board.columns[x].push(y);
+        board.diagonals1[x2].push(y);
+        board.diagonals2[y2].push(y);
+    }
+
+    //remove a queen from the board.
+    fn boardG_remove(board : &mut BoardG, mutation : (usize, usize)) 
+    {
+        let y = mutation.0 ;
+        let x = mutation.1 ;
+
+        let x2 = board.n + y - x;
+        let y2 = y + x;
+
+        let mut num_occupants = board.columns[ x ].len();
+        board.fitness -= ((num_occupants==2) as usize) *2  + (num_occupants>2) as usize;
+        //remove this column from 'attacks'
+        if(num_occupants==2)
+        {
+            board.attacks.remove( 
+                board.attacks.iter().position(
+                    |val| *val == (0,x)).unwrap()); //ugly af and suboptimal, fix later
+        }
+        let mut index_in_bucket = board.columns[x].iter().position(|i| *i==y ).unwrap();
+        board.columns[x].remove(index_in_bucket);
+
+        num_occupants = board.diagonals1[ x2 ].len() ;
+        board.fitness -= ((num_occupants==2) as usize) *2  + (num_occupants>2) as usize;
+        if(num_occupants==2)
+        {
+            board.attacks.remove( 
+                board.attacks.iter().position(
+                    |val| *val == (1,x2)).unwrap()); //ugly af and suboptimal, fix later
+        }
+        index_in_bucket = board.diagonals1[x2].iter().position(|i| *i==y ).unwrap();
+        board.diagonals1[x2].remove(index_in_bucket);
+
+
+        num_occupants = board.diagonals2[ y2 ].len() ;
+        board.fitness -= ((num_occupants==2) as usize) *2  + (num_occupants>2) as usize;
+        if(num_occupants==2)
+        {
+            board.attacks.remove( 
+                board.attacks.iter().position(
+                    |val| *val == (2,y2)).unwrap()); //ugly af and suboptimal, fix later
+        }
+        index_in_bucket = board.diagonals2[y2].iter().position(|i| *i==y ).unwrap();
+        board.diagonals2[y2].remove(index_in_bucket);
+
+        //forgot to ACTUALLY REMOVE STUFF
+    }
+
+    fn copy_boardG(from : &BoardG, to : &mut BoardG)
+    {
+        if(to.n!=from.n){panic!("Boards are not matching sizes!");}
+        to.fitness = from.fitness;
+        to.queens.clone_from(&from.queens);
+        to.columns.clone_from(&from.columns); //oops forgot that
+        to.attacks.clone_from(&from.attacks);
+        to.diagonals1.clone_from(&from.diagonals1);
+        to.diagonals2.clone_from(&from.diagonals2);
+    }
+
+    fn print_board2(queens : &Vec<Option<usize>>, n : usize)
+    {
+        println!("\n");
+        let mut line = vec![' ';n*3];
+        for i in (1..n*3).step_by(3) { line[i] = '#' }
+        for i in 0..n 
+        {
+            match queens[i]
+            {
+                Some(pos) => 
+                {
+                    let pos = queens[i].unwrap();
+                    line[pos*3+1] = 'Q';
+                    println!("{}", String::from_iter(&line));
+                    line[pos*3+1] = '#';
+                },
+                None => 
+                {
+                    println!("{}", String::from_iter(&line));
+                }
+            }
+        }
+        println!("\n");
+    }
+
+    fn board2str(board : &BoardG) -> String
+    {
+        let mut output = Vec::<char>::new();
+        let mut line = vec!['.';board.n];
+        line.push('\n');
+        for i in 0..board.n 
+        {
+            let col = board.queens[i];
+            line[col] = 'Q';
+            output.extend(&line);
+            line[col] = '.';
+        }
+        //output.pop(); //remove trailing newline.
+        return String::from_iter(&output);
+    }
+
+    //dont call on boards of size 2 or less, will hang.
+    fn random_queens2(p : usize, n : usize, mandatory_coord : (usize,usize)) -> Vec<Vec<usize>>
+    {
+        let mut rng = thread_rng();
+        let mut output = Vec::<Vec::<usize>>::new();
+        for i in 0..p
+        {
+            //generate vector of ordered ints from 0..n then randomly unsort it
+            let mut board = (0..n).into_iter().collect::<Vec<usize>>();
+
+            //make it so mandatory_coord is set- ie swap values of board[mc.0] and board[mc.1]
+            board[mandatory_coord.0] = mandatory_coord.1;
+            board[mandatory_coord.1] = mandatory_coord.0;
+            for j in 0..n
+            {
+                if(j==mandatory_coord.0){continue;}
+                let mut rand_index = rng.gen_range(0usize..n);
+                while(rand_index == mandatory_coord.0){rand_index = rng.gen_range(0usize..n);}
+                let temp = board[rand_index];
+                board[rand_index] = board[j];
+                board[j] = temp;
+            }
+            output.push(board);
+        }
+        return output;
+    }
+
+    //fills buckets, attacks, and fitness of newly created board. 
+    fn initialize_boardG(board : &mut BoardG)
+    {
+        for (y,x) in board.queens.iter().enumerate()
+        {
+            let x2 = board.n + y - *x;
+            let y2 = y  + *x;
+
+            let mut num_occupants = board.columns[ *x ].len();
+            board.fitness += ((num_occupants==1) as usize)*2 + (num_occupants>1) as usize;
+            if(num_occupants==1){board.attacks.push( (0,*x) );}
+
+            num_occupants = board.diagonals1[ x2 ].len() ;
+            board.fitness += ((num_occupants==1) as usize)*2 + (num_occupants>1) as usize;
+            if(num_occupants==1){board.attacks.push( (1,x2) );}
+
+            num_occupants = board.diagonals2[ y2 ].len() ;
+            board.fitness += ((num_occupants==1) as usize)*2 + (num_occupants>1) as usize;
+            if(num_occupants==1){board.attacks.push( (2,y2) );}
+
+            
+            //push this rownum to the buckets it falls into. may not need to track columns in future.
+            board.columns[*x].push(y);
+            board.diagonals1[x2].push(y);
+            board.diagonals2[y2].push(y);
+        }
+    }
+```
+</CodeSnippet>
+
+
