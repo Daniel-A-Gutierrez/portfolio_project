@@ -13,7 +13,7 @@ use lib::*;
 use rand::prelude::*;
 use rusqlite::{self, Connection, OptionalExtension};
 use serde::{Deserialize, Serialize};
-use std::{net::SocketAddr, sync::Arc};
+use std::{net::SocketAddr, sync::Arc, time::Duration};
 use tokio::{self, sync::Mutex};
 use tower_http;
 use tower_http::services::ServeDir;
@@ -30,11 +30,15 @@ type AppState = Arc<S>;
 const BIND: [u8; 4] = [127, 0, 0, 1];
 #[cfg(debug_assertions)]
 const PORT: u16 = 3334;
+#[cfg(debug_assertions)]
+const CLEAR_INTERVAL : u64 = 5000; //in millis
 // release build will be out-facing
 #[cfg(not(debug_assertions))]
 const BIND: [u8; 4] = [0, 0, 0, 0];
 #[cfg(not(debug_assertions))]
 const PORT: u16 = 80; // or 443 for https if we cert up
+#[cfg(not(debug_assertions))]
+const CLEAR_INTERVAL : u64 = 1000*60*60;
 
 #[tokio::main(flavor = "current_thread")]
 async fn main()
@@ -43,13 +47,19 @@ async fn main()
     let db = init_db().expect("Couldn't connect to database");
     let state = Arc::new(S { db:       Mutex::new(db),
                              sessions: DashSet::new(), });
+
     let api_router = axum::Router::new().route("/kv_set", put(kv_set))
                                         .route("/kv_get", post(kv_get))
                                         .route("/kv_json_append", post(kv_json_append))
                                         .route("/kv_delete", delete(kv_delete))
-                                        .layer(from_fn_with_state(state.clone(), check_session))
-                                        .route("/get_session", post(get_session))
-                                        .with_state(state);
+                                        //.layer(from_fn_with_state(state.clone(), check_session))
+                                        //.route("/get_session", post(get_session))
+                                        .with_state(state.clone());
+    tokio::spawn( async move { loop {
+        tokio::time::sleep(Duration::from_millis(CLEAR_INTERVAL)).await;
+        let cnxn = state.db.lock().await;
+        let _ = db_clear(&cnxn);
+    }});
     let page_router = axum::Router::new().route("/hello", get(|| async { "hello" }))
                                          .nest_service("/api", api_router)
                                          .nest_service("/", ServeDir::new("frontend/dist"))

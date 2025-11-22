@@ -12,8 +12,13 @@ import CodeSnippet from "/src/components/CodeSnippet.astro";
 import GLSLCanvas from "/src/components/GLSLCanvas.astro";
 import GLSLEditor from "/src/components/GLSLEditor.svelte";
 
-The banner on this website is a bit drab isn't it?  
-Maybe its time I spruced things up a bit. 
+
+It's been a bit since I did any shader stuff but I did play around with shadertoy back in the day when I did lots of gamedev.
+Here's (my favorite)[https://www.shadertoy.com/view/sdBfDy] thing I made on there. 
+If it just looks black, try clicking on it and moving your mouse around.  
+
+I've never really delved into learning how to use shaders myself though in a practical context so I'd like to learn how to 
+put them to work for me.
 
 # Off To A Great Start \s 
 
@@ -270,10 +275,86 @@ then use js to set that variable on each line, and pad things to look nice.
 ```
 </CodeSnippet>
 
+# Making The Website's Banner 
+So that mount fuji banner has a small problem - though you won't see it here because the example in this article is the same used on the banner. 
+As our aspect ratio skews wide, the lines start becoming discrete dots.
+
+Lets take a look into it.
+
+
+Ordinarily UV goes from 0-1 from the bottom left to the top right for x and y, 
+but in this case it goes from -1 to 1 from left to right and bottom to top.  
+However, before being passed into grid it's modified .
+
+<CodeSnippet filename="fuji.glsl main">
+```glsl
+    //other stuff
+    if (uv.y < -0.2)
+        {
+            uv.y = 3.0 / (abs(uv.y + 0.2) + 0.05);
+            uv.x *= uv.y * 1.0;
+            float gridVal = grid(uv, battery);
+```
+</CodeSnippet>
+
+So uv is wrapped so that everything from y=-.2 and below is reflected up and shifted up .05. 
+uv.x is then multiplied by that strictly positive number, effectively scaling it so that it skews out at the bottom and top edges 
+and in towards the horizon line. 
+Then, given that uv and battery(which is just 1 i think), we draw a grid. 
+
+<CodeSnippet filename="fuji.glsl">
+```glsl
+    float grid(vec2 uv, float battery)
+    {
+        vec2 size = vec2(uv.y, uv.y * uv.y * 0.2) * 0.01;
+        uv += vec2(0.0, iTime * 4.0 * (battery + 0.05));
+        uv = abs(fract(uv) - 0.5);
+        vec2 lines = smoothstep(size, vec2(0.0), uv);
+        lines += smoothstep(size * 5.0, vec2(0.0), uv) * 0.4 * battery;
+        return clamp(lines.x + lines.y, 0.0, 3.0);
+    }
+```
+</CodeSnippet>
+
+uv.y's range was from .05-1.25. Size is defined as the width and height of the line in uv space basically.
+The closer it is to the top or bottom of the screen the thicker it is, but it's height will vanish quickly towards
+the horizon line. 
+
+Adding time to the uv value just scrolls it.
+
+Fract is how we're getting a grid out of this - each time uv.x or uv.y exceeds a whole number it loops back to 0 effectively. 
+Abs(uv- .5) makes it so its repeating twice as fast over a smaller range.
+
+Smoothstep returns a value between size and 0, interpolated smoothly by uv . 
+Taking the sum of 2 smoothsteps where the second is scaled down but size is much greater adds a blur effect to the lines. 
+
+Lastly, we combine lines.x and y to return a high value when uv is near either a horizontal or vertical gridline. Clamping it 
+prevents the line from looking too bright at the intersections. 
+
+Now that we've dissected it , lets solve the problem of our lines falling apart in wide aspect ratios. 
+
+<CodeSnippet filename="my_fuji.glsl grid">
+```glsl
+    float grid(vec2 uv, float battery)
+    {
+        float hadj = abs(uv.x)*.5; //adjust the thickness of the lines out towards the sides so they dont get too sparse
+        vec2 size = vec2(hadj + uv.y, hadj + uv.y * uv.y * 0.2) * 0.01;
+        uv += vec2(0.0, iTime * 4.0 * (battery + 0.05));
+        uv = abs(fract(uv) - 0.5);
+        vec2 lines = smoothstep(size + hadj*.0078125, vec2(0.0), uv);
+        lines += smoothstep((size) * 3.0 + hadj*.0078125, vec2(0.0), uv) * 0.4 * battery; //this must be whats giving me the bloom
+        return clamp(lines.x + lines.y, 0.0, 3.0);
+    }
+```
+</CodeSnippet>
+
+I made hadj to scale with uv.x and basically just make the lines fatter towards the sides of the screen in a tasteful way.
+Not too hard I'd say, but it makes a big difference for the banner. 
+
 # Conclusion
 
-I think this has been a good starting point for my shaders journey, I have all 
-the tools I need set up and running and I'm pretty confident I can employ this 
+I think this has been a good practical step towards learning more about shades. I have all 
+the tools I need to put them to use set up and running and I'm pretty confident I can employ this 
 to make my website's banner now, which was honestly my main goal. 
 
-Once I find more interesting stuff in the world of shaders to write about, I'll follow this article up.
+Expect a followup once I find more interesting stuff in the world of shaders to write about!

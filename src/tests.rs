@@ -2,7 +2,7 @@
 mod test
 {
     extern crate test;
-    use std::sync::Arc;
+    use std::{sync::Arc, time::Duration};
 
     use crate::*;
     use reqwest::{self,
@@ -54,7 +54,7 @@ mod test
     }
 
     #[test]
-    async fn e2e() -> Result<()>
+    async fn get_session() -> Result<()>
     {
         let client = make_client();
         let res1 = api_request(&client,
@@ -78,6 +78,30 @@ mod test
                                                                                       .await?;
         let kvrow = serde_json::from_str::<KVRow>(&res3).unwrap();
         assert!(kvrow.value == "bye");
+        return Ok(());
+    }
+
+    #[test]
+    async fn db_clear() -> Result<()>
+    {
+        let client = make_client();
+        let (key, value) = ("hi".to_string(), "bye".to_string());
+        let _res1 = api_request(&client,
+                                "kv_set",
+                                Method::PUT,
+                                &KVSetRequest { key: key.clone(),
+                                                value }).await?;
+        let res2 = api_request(&client, "kv_get", Method::POST, &KVGetRequest { key:key.clone() }).await?
+                                                                                      .text()
+                                                                                      .await?;
+        tokio::time::sleep(Duration::from_millis(5000)).await;
+        let res3 = api_request(&client, "kv_get", Method::POST, &KVGetRequest { key }).await?
+                                                                                      .text()
+                                                                                      .await?;
+        let kvrow = serde_json::from_str::<Option<KVRow>>(&res2)?;
+        assert!(kvrow.is_some());                                                                     
+        let kvrow = serde_json::from_str::<Option<KVRow>>(&res3)?;
+        assert!(kvrow.is_none());
         return Ok(());
     }
 }

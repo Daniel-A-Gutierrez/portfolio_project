@@ -200,6 +200,13 @@ pub fn db_delete(conn: &Connection, key: &str) -> Result<(), DBError>
     return Ok(());
 }
 
+pub fn db_clear(conn: &Connection,) -> Result<(),DBError>
+{
+    conn.execute("DELETE FROM storage;",())
+        .map_err(|e| DBError::DBError(e))?;
+    return Ok(());
+}
+
 #[cfg(test)]
 mod libtest
 {
