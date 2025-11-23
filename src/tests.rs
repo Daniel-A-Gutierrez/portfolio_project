@@ -5,10 +5,9 @@ mod test
     use std::{sync::Arc, time::Duration};
 
     use crate::*;
-    use reqwest::{self,
+    use reqwest::{self, Client, RequestBuilder, Response,
                   cookie::{Cookie, Jar},
-                  header::{CONTENT_TYPE, SET_COOKIE},
-                  Client, RequestBuilder, Response};
+                  header::{CONTENT_TYPE, SET_COOKIE}};
     use serde_json::to_string as to_json;
     use test::Bencher;
     use tokio::test;
@@ -17,10 +16,7 @@ mod test
 
     fn make_client() -> Client
     {
-        let client =
-            reqwest::ClientBuilder::new().cookie_store(true)
-                                         .build()
-                                         .unwrap();
+        let client = reqwest::ClientBuilder::new().cookie_store(true).build().unwrap();
         //specify common headers, test different http modes, etc.
         return client;
     }
@@ -46,10 +42,11 @@ mod test
     async fn api_request<T>(c: &Client, route: &str, m: Method, body: &T) -> Result<Response>
         where T: ?Sized + Serialize
     {
-        let req = client_method(c,m,& (format!("{}/api/{}", SERVER_URL, route)))
-                    .header(CONTENT_TYPE, "application/json")
-                    .body(to_json(body).unwrap());
-        let res = req.send().await?; 
+        let req =
+            client_method(c, m, &(format!("{}/api/{}", SERVER_URL, route))).header(CONTENT_TYPE,
+                                                                                   "application/json")
+                                                                           .body(to_json(body).unwrap());
+        let res = req.send().await?;
         return Ok(res);
     }
 
@@ -91,15 +88,18 @@ mod test
                                 Method::PUT,
                                 &KVSetRequest { key: key.clone(),
                                                 value }).await?;
-        let res2 = api_request(&client, "kv_get", Method::POST, &KVGetRequest { key:key.clone() }).await?
-                                                                                      .text()
-                                                                                      .await?;
+        let res2 = api_request(&client,
+                               "kv_get",
+                               Method::POST,
+                               &KVGetRequest { key: key.clone() }).await?
+                                                                  .text()
+                                                                  .await?;
         tokio::time::sleep(Duration::from_millis(5000)).await;
         let res3 = api_request(&client, "kv_get", Method::POST, &KVGetRequest { key }).await?
                                                                                       .text()
                                                                                       .await?;
         let kvrow = serde_json::from_str::<Option<KVRow>>(&res2)?;
-        assert!(kvrow.is_some());                                                                     
+        assert!(kvrow.is_some());
         let kvrow = serde_json::from_str::<Option<KVRow>>(&res3)?;
         assert!(kvrow.is_none());
         return Ok(());

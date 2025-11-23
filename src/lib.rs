@@ -1,7 +1,7 @@
 #![feature(test)]
 use std::fmt::Display;
 mod tests;
-use anyhow::{anyhow, ensure, Result};
+use anyhow::{Result, anyhow, ensure};
 use rusqlite::{self, Connection, OptionalExtension, Row};
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
@@ -169,7 +169,7 @@ pub fn db_json_append(conn: &Connection, key: &str, val: &str) -> Result<(), DBE
 
     let mut raw_v: Value = serde_json::from_str(&b4.value).map_err(|e| DBError::Any(e.to_string()))?;
     //expect the value to be an iterable, fail otherwise.
-    if let Value::Array(ref mut inner) = &mut raw_v
+    if let Value::Array(inner) = &mut raw_v
     {
         inner.push(val_obj);
     }
@@ -200,9 +200,9 @@ pub fn db_delete(conn: &Connection, key: &str) -> Result<(), DBError>
     return Ok(());
 }
 
-pub fn db_clear(conn: &Connection,) -> Result<(),DBError>
+pub fn db_clear(conn: &Connection) -> Result<(), DBError>
 {
-    conn.execute("DELETE FROM storage;",())
+    conn.execute("DELETE FROM storage;", ())
         .map_err(|e| DBError::DBError(e))?;
     return Ok(());
 }

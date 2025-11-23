@@ -1,0 +1,31 @@
+[package]
+name = "Portfolio_Project"
+version = "0.1.0"
+edition = "2021"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[dependencies]
+anyhow = { version = "1.0.71" , features = ["std", "backtrace"]}
+axum = { version = "0.6.18", features = ["macros","json"] }
+axum-server = "0.5.1"
+hyper = { version = "0.14.26", features = ["http2"] }
+tokio = { version = "1.28.2", features = ["full"] }
+tower = "0.4.13"
+tower-http = { version = "0.4.0", features = ["fs"] }
+rusqlite = { version = "0.37.0", features = ["bundled"] }
+serde = { version = "1.0.228", features = ["derive"] }
+serde_json = "1.0.145"
+dashmap = "6.1.0"
+rand = "0.9.2"
+axum-extra = { version = "0.7.7", features = ["cookie", "form", "multipart", "cookie-private"] }
+reqwest = { version =  "0.12.24", features = ["cookies"] }
+
+[lib]
+name = "lib"
+path = "src/lib.rs"
+
+updating everything
+
+cargo add anyhow axum reqwest axum-server tokio rusqlite serde serde_json dashmap rand axum-extra \
+ -F axum-extra/cookie,axum-extra/form,axum-extra/multipart,axum-extra/cookie-private,reqwest/cookies,anyhow/std,anyhow/backtrace,axum/macros,axum/json,axum/http2,axum-server/tls-rustls,tokio/full,rusqlite/bundled,serde/derive

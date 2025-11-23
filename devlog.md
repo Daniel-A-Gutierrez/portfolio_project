@@ -75,3 +75,22 @@ Typescript Macros
 Captcha ideas - word associations, svg coloring, rhythm game
 
 Want to make a big or customizeable details header thing but ugh formatting this articles a pain and its still a lot of work left to be done...
+
+## 11/22/25
+Deploying on linode 
+bought a server for 5 bucks
+adduser d 
+passwd d (prompts for new password)
+usermod -aG wheel d
+sudo dnf install samba
+sudo systemctl enable smb --now
+
+//oop i didnt have samba on my own system so on mine
+sudo dnf install samba-client cifs-utils
+
+//back to the server
+sudo smbpasswd -a d  //create a samba user with the same name
+sudo nano /etc/samba/smb.conf //set [homes]/browseable to Yes
+
+welp shit didnt work . apparently it sucks over high latency connections anyway. 
+

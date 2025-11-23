@@ -1,21 +1,21 @@
-use anyhow::{ensure, Result};
-use axum::{self, debug_handler,
-           extract::State,
+use anyhow::{Result, ensure};
+use axum::{self, Json, Router,
+           body::Body,
+           debug_handler,
+           extract::{Request, State},
+           handler::HandlerWithoutStateExt,
            http::StatusCode,
-           middleware::{self, from_fn, from_fn_with_state, Next},
+           middleware::{self, Next, from_fn, from_fn_with_state},
            response::IntoResponse,
-           routing::{delete, get, post, put},
-           Json};
+           routing::{delete, get, post, put}};
 use axum_extra::extract::cookie::{Cookie, CookieJar};
 use dashmap::DashSet;
-use hyper::{Body, Request};
 use lib::*;
 use rand::prelude::*;
 use rusqlite::{self, Connection, OptionalExtension};
 use serde::{Deserialize, Serialize};
 use std::{net::SocketAddr, sync::Arc, time::Duration};
 use tokio::{self, sync::Mutex};
-use tower_http;
 use tower_http::services::ServeDir;
 
 struct S
@@ -31,14 +31,14 @@ const BIND: [u8; 4] = [127, 0, 0, 1];
 #[cfg(debug_assertions)]
 const PORT: u16 = 3334;
 #[cfg(debug_assertions)]
-const CLEAR_INTERVAL : u64 = 5000; //in millis
+const CLEAR_INTERVAL: u64 = 5000; //in millis
 // release build will be out-facing
 #[cfg(not(debug_assertions))]
 const BIND: [u8; 4] = [0, 0, 0, 0];
 #[cfg(not(debug_assertions))]
 const PORT: u16 = 80; // or 443 for https if we cert up
 #[cfg(not(debug_assertions))]
-const CLEAR_INTERVAL : u64 = 1000*60*60;
+const CLEAR_INTERVAL: u64 = 1000 * 60 * 60;
 
 #[tokio::main(flavor = "current_thread")]
 async fn main()
@@ -55,16 +55,19 @@ async fn main()
                                         //.layer(from_fn_with_state(state.clone(), check_session))
                                         //.route("/get_session", post(get_session))
                                         .with_state(state.clone());
-    tokio::spawn( async move { loop {
-        tokio::time::sleep(Duration::from_millis(CLEAR_INTERVAL)).await;
-        let cnxn = state.db.lock().await;
-        let _ = db_clear(&cnxn);
-    }});
-    let page_router = axum::Router::new().route("/hello", get(|| async { "hello" }))
+    tokio::spawn(async move {
+        loop
+        {
+            tokio::time::sleep(Duration::from_millis(CLEAR_INTERVAL)).await;
+            let cnxn = state.db.lock().await;
+            let _ = db_clear(&cnxn);
+        }
+    });
+    let page_router = axum::Router::new().route("/ping", get(|| async { "pong" }))
                                          .nest_service("/api", api_router)
                                          .nest_service("/", ServeDir::new("frontend/dist"))
                                          .into_make_service();
-    let _server = hyper::Server::bind(&addr).serve(page_router).await.unwrap();
+    let _server = axum_server::bind(addr).serve(page_router).await.unwrap();
 }
 
 #[debug_handler]
@@ -127,7 +130,7 @@ async fn get_session(state: State<AppState>,
 async fn check_session(state: State<AppState>,
                        jar: CookieJar,
                        req: Request<Body>,
-                       next: Next<Body>)
+                       next: Next)
                        -> impl IntoResponse
 {
     println!("{}", "checking session");
