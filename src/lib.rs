@@ -128,7 +128,7 @@ pub fn db_get(conn: &Connection, key: &str) -> Result<Option<KVRow>, DBError>
     return Ok(value);
 }
 
-#[rustfmt::ignore]
+#[rustfmt::skip]
 pub fn db_str_append(conn: &Connection, key: &str, val: &str) -> Result<(), DBError>
 {
     if val.len() > 10_000
@@ -147,7 +147,7 @@ pub fn db_str_append(conn: &Connection, key: &str, val: &str) -> Result<(), DBEr
     return Ok(());
 }
 
-#[rustfmt::ignore]
+#[rustfmt::skip]
 pub fn db_json_append(conn: &Connection, key: &str, val: &str) -> Result<(), DBError>
 {
     if val.len() > 10_000

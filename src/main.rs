@@ -1,14 +1,16 @@
 use anyhow::{Result, ensure};
-use axum::{self, Json, Router,
+use axum::http::header;
+use axum::{self, Json, Router, ServiceExt,
            body::Body,
            debug_handler,
            extract::{Request, State},
            handler::HandlerWithoutStateExt,
-           http::StatusCode,
+           http::{HeaderMap, HeaderName, HeaderValue, StatusCode},
            middleware::{self, Next, from_fn, from_fn_with_state},
            response::IntoResponse,
            routing::{delete, get, post, put}};
 use axum_extra::extract::cookie::{Cookie, CookieJar};
+use axum_response_cache::CacheLayer;
 use dashmap::DashSet;
 use lib::*;
 use rand::prelude::*;
@@ -16,8 +18,14 @@ use rusqlite::{self, Connection, OptionalExtension};
 use serde::{Deserialize, Serialize};
 use std::{net::SocketAddr, sync::Arc, time::Duration};
 use tokio::{self, sync::Mutex};
+use tower_http::compression::CompressionLayer;
+use tower_http::decompression::DecompressionLayer;
 use tower_http::services::ServeDir;
-
+use tower_http::set_header::SetResponseHeaderLayer;
+use tower_http::trace::TraceLayer;
+use tracing::instrument::WithSubscriber;
+use tracing_subscriber::EnvFilter;
+use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt};
 struct S
 {
     pub db:       Mutex<rusqlite::Connection>,
@@ -32,6 +40,8 @@ const BIND: [u8; 4] = [127, 0, 0, 1];
 const PORT: u16 = 3334;
 #[cfg(debug_assertions)]
 const CLEAR_INTERVAL: u64 = 5000; //in millis
+#[cfg(debug_assertions)]
+const CACHE_LIFETIME: u64 = 1;
 // release build will be out-facing
 #[cfg(not(debug_assertions))]
 const BIND: [u8; 4] = [0, 0, 0, 0];
@@ -39,6 +49,8 @@ const BIND: [u8; 4] = [0, 0, 0, 0];
 const PORT: u16 = 80; // or 443 for https if we cert up
 #[cfg(not(debug_assertions))]
 const CLEAR_INTERVAL: u64 = 1000 * 60 * 60;
+#[cfg(not(debug_assertions))]
+const CACHE_LIFETIME: u64 = 31535999;
 
 #[tokio::main(flavor = "current_thread")]
 async fn main()
@@ -48,12 +60,21 @@ async fn main()
     let state = Arc::new(S { db:       Mutex::new(db),
                              sessions: DashSet::new(), });
 
+    tracing_subscriber::registry().with(EnvFilter::try_from_default_env().or_else(|_| {
+                                            EnvFilter::try_new(&format!("{}=warn,tower_http=debug",
+                                                                        env!("CARGO_CRATE_NAME")))
+                                        })
+                                        .unwrap())
+                                  .with(tracing_subscriber::fmt::layer())
+                                  .init();
+
     let api_router = axum::Router::new().route("/kv_set", put(kv_set))
                                         .route("/kv_get", post(kv_get))
                                         .route("/kv_json_append", post(kv_json_append))
                                         .route("/kv_delete", delete(kv_delete))
                                         //.layer(from_fn_with_state(state.clone(), check_session))
                                         //.route("/get_session", post(get_session))
+                                        .layer(CompressionLayer::new().quality(tower_http::CompressionLevel::Fastest))
                                         .with_state(state.clone());
     tokio::spawn(async move {
         loop
@@ -63,11 +84,21 @@ async fn main()
             let _ = db_clear(&cnxn);
         }
     });
-    let page_router = axum::Router::new().route("/ping", get(|| async { "pong" }))
-                                         .nest_service("/api", api_router)
-                                         .nest_service("/", ServeDir::new("frontend/dist"))
-                                         .into_make_service();
-    let _server = axum_server::bind(addr).serve(page_router).await.unwrap();
+    let cache_control_layer =
+        SetResponseHeaderLayer::appending(header::CACHE_CONTROL,
+                                          HeaderValue::from_str(&format!("max-age:{},public",CACHE_LIFETIME)).unwrap());
+    let page_router = axum::Router::new().fallback_service(ServeDir::new("./frontend/dist"))
+                                         .route("/hello", get(|| async { "hi" }))
+                                         .layer(cache_control_layer)
+                                         .layer(CompressionLayer::new().quality(tower_http::CompressionLevel::Best))
+                                         .layer(CacheLayer::with_lifespan(Duration::from_secs(CACHE_LIFETIME)));
+    let router =
+        axum::Router::new().merge(page_router)
+                           .nest("/api", api_router)
+                           .layer(TraceLayer::new_for_http())
+                           .layer(DecompressionLayer::new())
+                           .into_make_service();
+    let _server = axum_server::bind(addr).serve(router).await.unwrap();
 }
 
 #[debug_handler]

@@ -15,8 +15,11 @@
         return w < mobileBreakpoint ? container.offsetWidth : container.offsetWidth / 2;
     }
 
-    onMount( () => {
-
+    onMount( async () => {
+        if(GlslEditor == null)
+        {
+            await new Promise(resolve => setTimeout(resolve,1000));
+        }   
         let glslEditor = new GlslEditor(`#${uid}`, { 
             canvas_size: calcResponsiveWidth(),
             canvas_draggable: false,
@@ -32,7 +35,7 @@
             let w = calcResponsiveWidth();
             glslEditor.shader.canvas.canvas.style="background-color:rgb(1,1,1);";
             glslEditor.shader.canvas.canvas.width=w;
-            //glslEditor.shader.canvas.canvas.height=w;
+            glslEditor.shader.canvas.canvas.height=w;
         };
         window.addEventListener('resize',resizer);
         return () => {window.removeEventListener('resize',resizer)};

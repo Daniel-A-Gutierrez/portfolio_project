@@ -31,7 +31,7 @@ But it cant be imported!
 So after following the instructions in the most recent issue (thats been open for 14 months)
 I had to modify the library's package.json [like so](https://github.com/actarian/glsl-canvas/issues/46)
 
-It doesnt seem [that complicated](https://dev.to/hayyanstudio/creating-simple-shaders-in-webgl-a-step-by-step-guide-46gg)
+It doesn't seem [that complicated](https://dev.to/hayyanstudio/creating-simple-shaders-in-webgl-a-step-by-step-guide-46gg)
 to just do things from scratch so I'll consider that if the library ends up being more of a pain than it's worth.
 
 # Creating The Canvas 
@@ -117,7 +117,7 @@ After some fruitless faffing about with content collections I wound up with this
         }
     ```
 </CodeSnippet>
-<GLSLCanvas src="public/shader.glsl" class="centered" width="400" height="400"/>
+<GLSLCanvas src="public/shader.glsl" class="centered" width="400px" height="400px"/>
 
 That was surprisingly easy to get running, actually. Yay!
 
@@ -132,7 +132,7 @@ in glslCanvas, lets see how easy it is to copy one over.
 I was thinking of using [this awesome cyber fuji shader](https://www.shadertoy.com/view/Wt33Wf) for the banner of my website, lets
 start by just copy pasting it over the 'mainImage' function in my previous shader.
 
-<GLSLCanvas src="public/fuji.glsl" class="centered" width="1000" height="400" style="max-width:100%"/>
+<GLSLCanvas src="public/fuji.glsl" class="centered" width="100%" height="300px"/>
 <div><small>[kaiware007](https://www.shadertoy.com/user/kaiware007)</small></div>
 
 Holy cow it's actually that easy.
@@ -358,3 +358,18 @@ the tools I need to put them to use set up and running and I'm pretty confident 
 to make my website's banner now, which was honestly my main goal. 
 
 Expect a followup once I find more interesting stuff in the world of shaders to write about!
+
+# A Few Days Later...
+
+Man this glsl-canvas library does have some real bugs.  
+All the canvases on my site randomly broke one day when, for some reason, vite started linking the cjs 
+version of the library instead of the esm one. 
+I tried fixing it for a good while and did find the bug - a resize event handler was multiplying the canvas's resolution 
+by the devicePixelRatio when it should have been dividing, causing the canvases to explode or shink to nothing when it wasn't 1.
+
+I ended up copying the esm version of the library from node modules into my source folder and modifying it myself. 
+
+Also the glsl-editor one is just as bad , being that it depends on glsl-canvas, and it also causes a console warning due to 
+some misoptimization.  
+
+Props to the guy for making these but it sucks that theyre totally unmaintained.  

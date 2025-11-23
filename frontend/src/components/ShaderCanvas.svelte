@@ -1,17 +1,18 @@
 <script lang="ts">
-    export interface Props {shader:string};
-    import {Canvas} from 'glsl-canvas-js';
-    import {ContextMode} from 'glsl-canvas-js/dist/cjs/context/context';
+    export interface Props {shader:string, height:string, width:string};
+    import {Canvas} from '/src/scripts/glsl-canvas/glsl.js';
     import {onMount} from 'svelte'; 
-    let {shader, ...rest} : Props = $props();
+    let {shader, height, width, ...rest} : Props = $props();
     let canvas : HTMLCanvasElement;
     let container : HTMLDivElement;
     onMount( () =>
     {
+        if(!height && !width){console.warn("Height or width not set on Shader Canvas!");}
+
         const glsl = new Canvas(canvas, {
             alpha: false,
             antialias: true,
-            mode: ContextMode.Flat,
+            mode: "flat",
             extensions: ["EXT_shader_texture_lod"]
         });
         glsl.load(shader);
@@ -25,6 +26,14 @@
         return () => {window.removeEventListener('resize',resizer)};
     });
 </script>
-<div bind:this={container} {...rest}>
-    <canvas bind:this={canvas} ></canvas>
+<div bind:this={container} style="width:{width}; height:{height};" {...rest}>
+    <canvas bind:this={canvas}></canvas>
 </div>
+
+<style>
+    canvas 
+    {
+        width: 100% !important;
+        height: 100% !important;
+    }
+</style>

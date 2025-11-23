@@ -93,4 +93,47 @@ sudo smbpasswd -a d  //create a samba user with the same name
 sudo nano /etc/samba/smb.conf //set [homes]/browseable to Yes
 
 welp shit didnt work . apparently it sucks over high latency connections anyway. 
+nevermind samba, dolphin worked immediately with sftp instead of smb. 
 
+# 11/23/25
+Ok deployment time - i enabled caching and compression on the server, as well as 
+the cache control header. 
+
+i think i need to 
+- create a new nologin user 'webserver'
+    //shell is nologin and -r means no home dir
+    sudo useradd webserver -s /sbin/nologin -r
+    //userdel -r username if you mess up, chsh -s if you want to change the shell later.
+- put the server files in a directory owned by root so they cant be written to by the new user, probably opt/website
+    sudo cp -r ~/server /opt/server
+    // ' ls -l ' to check permissions, it should be r-x for the rightmost 3 (any user)
+- create a systemd service that runs the website with the cwd set to /opt/website and the user set to 'webserver'
+    
+Here's what i've got for systemd
+    /etc/systemd/system/portfolio-server.service
+
+    [Unit]
+    Description=My Portfolio's Web Server
+    After=network.target
+
+    [Service]
+    User=webserver
+    WorkingDirectory=/opt/server
+    ExecStart=/opt/server/release/portfolio
+    Restart=on-failure
+
+    [Install]
+    WantedBy=multi-user.target
+
+then we have to setcap it so it can run on port 80
+    sudo setcap 'cap_net_bind_service=+eip' /opt/server/release/portfolio
+enable it
+    sudo systemctl enable portfolio-server
+    systemctl status portfolio-server
+//potentially, start it
+    systemctl status portfolio-server
+
+Then to limit the amount of logs it keeps
+    # /etc/systemd/journald.conf
+    [Journal]
+    SystemMaxUse=1G 

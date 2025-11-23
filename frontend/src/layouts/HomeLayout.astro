@@ -17,7 +17,7 @@ const props : Props = Astro.props; //frontmatter = astro.props.frontmatter
 let frontmatter : HomePageFrontmatter | undefined = props?.frontmatter;
 ---
 <Layout title={props.title}>
-<GLSLCanvas src="public/fuji.glsl" class="home-banner"/>
+<GLSLCanvas src="public/fuji.glsl" class="home-banner" height="min(30vh, 300px)"/>
 <div class="credit">
     <a href="https://www.shadertoy.com/user/kaiware007">kaiware007</a>
 </div>
@@ -43,7 +43,6 @@ let frontmatter : HomePageFrontmatter | undefined = props?.frontmatter;
     }
 
     :global(.home-banner){
-        height: min(30vh, 300px);
         z-index: 3;
     }
     .credit
