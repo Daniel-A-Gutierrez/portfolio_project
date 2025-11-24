@@ -301,8 +301,8 @@ export default class Canvas extends Renderer {
             // Lookup the size the browser is displaying the canvas in CSS pixels
             // and compute a size needed to make our drawingbuffer match it in
             // device pixels.
-            const W = Math.ceil(CW / this.devicePixelRatio);
-            const H = Math.ceil(CH / this.devicePixelRatio);
+            const W = Math.ceil(CW * this.devicePixelRatio);
+            const H = Math.ceil(CH * this.devicePixelRatio);
             this.W = W;
             this.H = H;
             this.canvas.width = W;

@@ -10,11 +10,11 @@ draft : false
 
 import CodeSnippet from "/src/components/CodeSnippet.astro";
 import GLSLCanvas from "/src/components/GLSLCanvas.astro";
-import GLSLEditor from "/src/components/GLSLEditor.svelte";
+//import GLSLEditor from "/src/components/GLSLEditor.svelte";
 
 
 It's been a bit since I did any shader stuff but I did play around with shadertoy back in the day when I did lots of gamedev.
-Here's (my favorite)[https://www.shadertoy.com/view/sdBfDy] thing I made on there. 
+Here's [my favorite](https://www.shadertoy.com/view/sdBfDy) thing I made on there. 
 If it just looks black, try clicking on it and moving your mouse around.  
 
 I've never really delved into learning how to use shaders myself though in a practical context so I'd like to learn how to 
@@ -35,11 +35,11 @@ It doesn't seem [that complicated](https://dev.to/hayyanstudio/creating-simple-s
 to just do things from scratch so I'll consider that if the library ends up being more of a pain than it's worth.
 
 # Creating The Canvas 
-(Thanks to this guide)[https://michaelmuratov.com/blog/guides/simple_shader/] I'm 
+[Thanks to this guide](https://michaelmuratov.com/blog/guides/simple_shader/) I'm 
 not flying in the dark completely, but I do need to adapt things to work within Astro.
 
 Ideally I can leverage it to load my shader from a dedicated shader.glsl file so
-that I can use a VSCode extension like (this)[https://open-vsx.org/vscode/item?itemName=slevesque.shader]
+that I can use a VSCode extension like [this](https://open-vsx.org/vscode/item?itemName=slevesque.shader)
 to make the experience nicer.
 
 After some fruitless faffing about with content collections I wound up with this. 
@@ -142,7 +142,7 @@ code mirror... actually nevermind, the guy who wrote this made the shader editor
 into a library called [glslEditor](https://github.com/patriciogonzalezvivo/glslEditor).  
 What a legend. 
 
-<GLSLEditor client:only uid="glsl-editor"/>
+{/* <GLSLEditor client:only uid="glsl-editor"/> */}
 
 That actually wasn't exactly simple to get into the project.
 I ended up linking to the jsDeliver CDN from the head of my project instead of using
@@ -170,8 +170,11 @@ is good though. Here's the code
             return w < mobileBreakpoint ? container.offsetWidth : container.offsetWidth / 2;
         }
 
-        onMount( () => {
-
+        onMount( async () => {
+            if(GlslEditor == null)
+            {
+                await new Promise(resolve => setTimeout(resolve,1000));
+            }   
             let glslEditor = new GlslEditor(`#${uid}`, { 
                 canvas_size: calcResponsiveWidth(),
                 canvas_draggable: false,
@@ -183,12 +186,13 @@ is good though. Here's the code
                 lineWrapping: false
             });
             console.log(glslEditor);
-            let resizer = window.addEventListener('resize', () => {
+            let resizer =  () => {
                 let w = calcResponsiveWidth();
                 glslEditor.shader.canvas.canvas.style="background-color:rgb(1,1,1);";
                 glslEditor.shader.canvas.canvas.width=w;
-                //glslEditor.shader.canvas.canvas.height=w;
-            });
+                glslEditor.shader.canvas.canvas.height=w;
+            };
+            window.addEventListener('resize',resizer);
             return () => {window.removeEventListener('resize',resizer)};
         });
     </script>
@@ -203,23 +207,16 @@ is good though. Here's the code
             }
 
             .glsl-editor-container > .ge_editor {
-                width: 100%;
                 order:2;
             }
             
             .glsl-editor-container > .ge_canvas_container 
             {
                 display:block;
-                width: 100%;
                 position:unset;
                 order:1;
             }
-            .glsl-editor-container > .ge_canvas_container > canvas 
-            {
-                display:block;
-                margin-left:auto;
-                margin-right:auto;
-            }
+
             @media (min-width:576px) {
                 .glsl-editor-container > .ge_canvas_container 
                 {
@@ -364,12 +361,17 @@ Expect a followup once I find more interesting stuff in the world of shaders to 
 Man this glsl-canvas library does have some real bugs.  
 All the canvases on my site randomly broke one day when, for some reason, vite started linking the cjs 
 version of the library instead of the esm one. 
-I tried fixing it for a good while and did find the bug - a resize event handler was multiplying the canvas's resolution 
-by the devicePixelRatio when it should have been dividing, causing the canvases to explode or shink to nothing when it wasn't 1.
+I tried fixing it for a good while and did find the bug - a resize event handler was modifying the size of the canvas, causing 
+it to trigger itself recursively.  
 
-I ended up copying the esm version of the library from node modules into my source folder and modifying it myself. 
+I'm not entirely sure how I fixed it - I did find some bugs in my css but it was only fixed when I copied the esm version to my src 
+folder and linked to that instead of the npm package. In any case, should the devicePixelRatio change *something* breaks. 
 
 Also the glsl-editor one is just as bad , being that it depends on glsl-canvas, and it also causes a console warning due to 
 some misoptimization.  
 
 Props to the guy for making these but it sucks that theyre totally unmaintained.  
+
+# Edit 2 
+
+Removed glslEditor from the site, breaks sporadically.

@@ -95,6 +95,9 @@ sudo nano /etc/samba/smb.conf //set [homes]/browseable to Yes
 welp shit didnt work . apparently it sucks over high latency connections anyway. 
 nevermind samba, dolphin worked immediately with sftp instead of smb. 
 
+the big problem ended up being firewalld - me not knowing it existed thanks to old ass
+stck overflow posts mainly.
+
 # 11/23/25
 Ok deployment time - i enabled caching and compression on the server, as well as 
 the cache control header. 
@@ -137,3 +140,29 @@ Then to limit the amount of logs it keeps
     # /etc/systemd/journald.conf
     [Journal]
     SystemMaxUse=1G 
+
+Dont forget to open the ports in firewalld 
+
+    sudo firewall-cmd --add-port=80/tcp --permanent
+then
+    sudo systemctl restart firewalld
+
+# ok so generally now the process for updating the frontend is 
+
+in dolphin sftp://d@{server_ip}
+copy the files from ./frontend/dist over to ~/server/frontend/dist
+    ssh d@{server_ip}
+    sudo cp -r ~/server/frontend/dist /opt/server/frontend
+    sudo systemctl restart portfolio-server
+then in cloudflare enable developer mode to turn off caching
+
+# to update the backend 
+in dolphin sftp://d@{server_ip}
+copy  ./target/release/portfolio over to ~/server/release/portfolio
+    ssh d@{server_ip}
+    sudo systemctl stop portfolio-server
+    sudo cp -r ~/server/release/portfolio /opt/server/release/portfolio
+    sudo setcap 'cap_net_bind_service=+eip' /opt/server/release/portfolio
+    sudo systemctl start portfolio-server
+then in cloudflare enable developer mode turn caching off and on again.
+

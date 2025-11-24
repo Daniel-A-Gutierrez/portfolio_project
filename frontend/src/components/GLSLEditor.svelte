@@ -52,23 +52,16 @@
         }
 
         .glsl-editor-container > .ge_editor {
-            width: 100%;
             order:2;
         }
         
         .glsl-editor-container > .ge_canvas_container 
         {
             display:block;
-            width: 100%;
             position:unset;
             order:1;
         }
-        .glsl-editor-container > .ge_canvas_container > canvas 
-        {
-            display:block;
-            margin-left:auto;
-            margin-right:auto;
-        }
+
         @media (min-width:576px) {
             .glsl-editor-container > .ge_canvas_container 
             {

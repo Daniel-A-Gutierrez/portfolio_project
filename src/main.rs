@@ -11,6 +11,7 @@ use axum::{self, Json, Router, ServiceExt,
            routing::{delete, get, post, put}};
 use axum_extra::extract::cookie::{Cookie, CookieJar};
 use axum_response_cache::CacheLayer;
+use axum_server::tls_rustls::RustlsConfig;
 use dashmap::DashSet;
 use lib::*;
 use rand::prelude::*;
@@ -46,13 +47,13 @@ const CACHE_LIFETIME: u64 = 1;
 #[cfg(not(debug_assertions))]
 const BIND: [u8; 4] = [0, 0, 0, 0];
 #[cfg(not(debug_assertions))]
-const PORT: u16 = 80; // or 443 for https if we cert up
+const PORT: u16 = 443; // or 443 for https if we cert up
 #[cfg(not(debug_assertions))]
 const CLEAR_INTERVAL: u64 = 1000 * 60 * 60;
 #[cfg(not(debug_assertions))]
-const CACHE_LIFETIME: u64 = 31535999;
+const CACHE_LIFETIME: u64 = 600;
 
-#[tokio::main(flavor = "current_thread")]
+#[tokio::main]
 async fn main()
 {
     let addr = SocketAddr::from((BIND, PORT)); //0.0.0.0 for outfacing
@@ -98,7 +99,11 @@ async fn main()
                            .layer(TraceLayer::new_for_http())
                            .layer(DecompressionLayer::new())
                            .into_make_service();
-    let _server = axum_server::bind(addr).serve(router).await.unwrap();
+    let config = RustlsConfig::from_pem_file("./secrets/daniel-gutierrez.com.pem", "./secrets/daniel-gutierrez.com.key")
+                                .await
+                                .expect("Failed to parse SSL Certificate");
+    println!("Starting Server");
+    let _server = axum_server::bind_rustls(addr,config).serve(router).await.unwrap();
 }
 
 #[debug_handler]

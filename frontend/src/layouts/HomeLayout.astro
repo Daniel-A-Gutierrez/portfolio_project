@@ -27,7 +27,7 @@ let frontmatter : HomePageFrontmatter | undefined = props?.frontmatter;
     <slot  name='link2'>{ frontmatter ? <a href = {frontmatter.leftlink} > {frontmatter.lefttext} </a> : <a>placeholder2</a>}</slot>
     <a class= 'pfp-placeholder' href=""></a>
     <slot  name='link3'>{ frontmatter ? <a href = {frontmatter.rightlink} > {frontmatter.righttext} </a> : <a>placeholder3</a>}</slot> 
-    <a href="/spring 25 resume.pdf" target="_blank" data-cold download>Resume</a>
+    <a href="/resume.pdf" target="_blank" data-cold download>Resume</a>
 </div>
 <div class={frontmatter?'mdcontainer':''}> <slot></slot> </div>
 </Layout>
