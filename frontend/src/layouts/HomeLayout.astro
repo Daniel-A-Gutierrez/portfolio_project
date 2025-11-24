@@ -25,26 +25,23 @@ let frontmatter : HomePageFrontmatter | undefined = props?.frontmatter;
 <div class="navigator">
     <a target='_blank' href="https://www.youtube.com/channel/UCDp6SYcFblFx5udgwHe5Shg/featured">Youtube</a>
     <slot  name='link2'>{ frontmatter ? <a href = {frontmatter.leftlink} > {frontmatter.lefttext} </a> : <a>placeholder2</a>}</slot>
-    <a class= 'pfp-placeholder' href=""></a>
+    <a class= 'pfp-placeholder' href="">&nbsp;</a>
     <slot  name='link3'>{ frontmatter ? <a href = {frontmatter.rightlink} > {frontmatter.righttext} </a> : <a>placeholder3</a>}</slot> 
     <a href="/resume.pdf" target="_blank" data-cold download>Resume</a>
 </div>
-<div class={frontmatter?'mdcontainer':''}> <slot></slot> </div>
+<article class={frontmatter?'mdcontainer':''}> <slot></slot> </article>
 </Layout>
 
 
-<style>
+<style is:global>
 
-    :global(h1)
+    h1
     {
         text-align: center;
         font-size: 2.5em;
         color : var(--headertxt);
     }
-
-    :global(.home-banner){
-        z-index: 3;
-    }
+    
     .credit
     {
         position:absolute;
@@ -52,75 +49,113 @@ let frontmatter : HomePageFrontmatter | undefined = props?.frontmatter;
         right:.75rem;
     }
 
-    /* :global(p) :global(img)
-    {
-        max-width: 100%;
-        max-height: 500px;
-        object-fit: contain;
-        margin: 25px auto;
-        display: block;
-    } */
+	article
+	{
+		width: 95%;
+		max-width: var(--article-max-width);
+		margin: auto;
+	}
 
-    .mdcontainer
-    {
-        width:60%;
-        margin:auto;
-        margin-top:100px;
-        font-size : 1.1em;
-    }
+    footer
+	{
+		border-top: 1px solid var(--secondtext);
+		margin-top:20px;
+		padding:20px 0px;
+	}
+</style>
 
-
+<style>
     .pfp
     {
         --picsize: 100px;
+        display: block;
         width: var(--picsize);
         height: var(--picsize);
         margin: calc(-1 * var(--picsize)/2) auto;
         border-radius: 50px;
-        background-image: url('images/me portrait.jpg');
+        background-image: url('/images/portrait.jpg');
         background-position: center;
         background-size: cover;
         z-index: 100;
         position:relative;
     }
-    .navigator
-        {
-            display:grid;
-            grid-template-columns: repeat(5,1fr);
-            width: 90%;
-            margin : 10px auto;
-            font-size : 1.25rem;
-        }
 
-    .navigator :global(a) /*style elements while ignoring scope. THE SPACING IS IMPORTANT HERE.*/
-    {
-        color: var(--headertxt);
-        text-decoration: inherit;
-        margin : auto;
-    }
-    
-    .navigator :global(a:hover)
-    {
-        color : var(--secondtext);
-    }
-    
     .pfp-placeholder
     {
         width: 100px;
         display: block;
     }
-    
-    @media (width<400px)
+
+    @media (width<576px) {
+        .navigator{
+            grid-template-columns: repeat(5,1fr);
+        }
+        .pfp-placeholder{
+            grid-column : 3!important;
+            order: 2;
+            grid-row: 1/3!important;
+        }
+        .navigator>:nth-child(2) 
+        {
+            grid-column: 2/3!important;
+            grid-row:2!important;
+        }
+        .navigator>:nth-child(4) 
+        {
+
+            grid-column: 4/5 !important;
+            grid-row:2!important;
+        }
+        .navigator>a{
+            grid-column: span 2;
+        }
+    }
+    @media (width>=576px) {
+        .navigator
+        {
+            grid-template-columns: repeat(5,1fr);
+        }
+    }
+
+
+    .navigator
+    {
+        display:grid;
+        width: 95%;
+        margin-left : auto;
+        margin-right: auto;
+        overflow:hidden;
+        font-size : 1.25rem;
+        row-gap: 5%;
+        column-gap: 5%;
+    }
+
+    .pfp-placeholder
+    {
+        grid-column:3;
+    }
+
+    .navigator > a:hover
+    {
+        color : var(--secondtext);
+    }
+
+    .navigator>a
+    {
+        color: var(--headertxt);
+        text-decoration: inherit;
+        margin : auto;
+    }
+    @media (width<576px)
     {
         .navigator
         {
-            grid-template-columns: repeat(3,1fr);
-        }
-    
-        .pfp-placeholder
-        {
-            grid-column:2/2;
-            grid-row:1/3;
+            display:grid;
+            grid-template-columns: repeat(5,15%);
+            grid-template-rows: (2,1fr);
         }
     }
+
+
+
 </style>
