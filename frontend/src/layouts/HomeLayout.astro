@@ -86,6 +86,21 @@ let frontmatter : HomePageFrontmatter | undefined = props?.frontmatter;
         display: block;
     }
 
+    
+</style>
+
+<style is:global>
+    .navigator > a:hover
+    {
+        color : var(--secondtext);
+    }
+
+    .navigator >a
+    {
+        color: var(--headertxt);
+        text-decoration: none;
+        margin : auto;
+    }
     @media (width<576px) {
         .navigator{
             grid-template-columns: repeat(5,1fr);
@@ -135,17 +150,7 @@ let frontmatter : HomePageFrontmatter | undefined = props?.frontmatter;
         grid-column:3;
     }
 
-    .navigator > a:hover
-    {
-        color : var(--secondtext);
-    }
 
-    .navigator>a
-    {
-        color: var(--headertxt);
-        text-decoration: inherit;
-        margin : auto;
-    }
     @media (width<576px)
     {
         .navigator
@@ -155,7 +160,4 @@ let frontmatter : HomePageFrontmatter | undefined = props?.frontmatter;
             grid-template-rows: (2,1fr);
         }
     }
-
-
-
 </style>
