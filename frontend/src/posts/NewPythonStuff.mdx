@@ -112,7 +112,7 @@ Setting it up inside of the python project :
 
 Lets just start from this hello world template : 
 
-<CodeSnippet filename="bash">
+<CodeSnippet filename="example main.rs">
 ```rust 
     use axum::{response::Html, routing::get, Router};
     use tokio;
@@ -138,7 +138,7 @@ Lets just start from this hello world template :
 
 Just a drop of elbow grease later we have 
 
-<CodeSnippet filename="bash">
+<CodeSnippet filename="main.rs">
 ```rust 
     //run with cargo run -r 
     use axum::{Router, routing::post, extract::Json};
@@ -213,7 +213,7 @@ target is snap, so be it.
 
 I took a stab at writing this and after fixing a few small mistakes I was left with something really puzzling.
 
-<CodeSnippet filename="bash">
+<CodeSnippet filename="main.py">
 ```python 
     import asyncio
     from pyreqwest.client import Client, ClientBuilder 
@@ -276,7 +276,7 @@ It just sets the content-type header.
 
 So, we get to use orjson afterall. 
 
-<CodeSnippet filename="error">
+<CodeSnippet filename="fixes">
 ```python
     import orjson
     
