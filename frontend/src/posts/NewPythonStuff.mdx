@@ -1,11 +1,11 @@
 ---
-title : "Multithreading Python?"
-description : "I'm very late to this party but its not my fault! Also checking out ruff and uv."
+title : "Benchmarking Python's New Free Threads"
+description : "Let's see how much of a speedup we can get."
 preview : "/previews/pithon.jpg"
 layout : '../layouts/ArticleLayout.astro'
 published : '11/27/2025'
 tags : ['Python']
-draft : true
+draft : false
 ---
 
 import CodeSnippet from '/src/components/CodeSnippet.astro';
@@ -13,24 +13,509 @@ import PotluckThing from '/src/components/PotluckThing.svelte';
 import facepalm from '/src/images/facepalm.png';
 import ArticleImage from '/src/components/ArticleImage.astro';
 import DetailsHeader from '/src/components/DetailsHeader.astro';
+import StaticTreeView from '/src/components/StaticTreeView.svelte';
 
 # It's Been A Minute 
-It's been a while since I last touched python, and from what I've heard there's been some big changes. 
+It's been a while since I last touched python, and from what there's been some big changes. 
 The uv package manager looks like a good competitor to npm and cargo, ruff can handle linting and point out bugs 100x faster 
 than pylint, and most excitingly, we have actual threads in python now. Lets get started. 
 
+Also, because this project's source code won't be part of my website, the full source code can be published [here]()
+
 # Getting Python 3.14
 I run Nobara, which is a Fedora based distro, meaning I had to wait until Fedora 43 released to get python from the official source.
-6000 packages and a reboot later, and here we are. 
+6000 package updates and a reboot later, and here we are. 
 
 <CodeSnippet filename="bash">
 ```bash 
-    python --version
+    > python --version
+    Python 3.14.0
 ```
 </CodeSnippet>
+
+# Setup
+Installing uv is pretty [simple](https://docs.astral.sh/uv/getting-started/installation/), just run the appropriate shell script for your OS.
+
+I made a new directory for my python projects then a new folder within it called
+multithreading_benchmark, opened vscode there and ran 
 
 <CodeSnippet filename="bash">
 ```bash 
+    uv init
+```
+</CodeSnippet>
+
+Which gives us a project structure like 
+
+<StaticTreeView tree = {{label: "multithreading_benchmark", children : [
+    {label: ".gitignore"},
+    {label: ".python-version "},
+    {label: ".main.py "},
+    {label: "pyproject.toml"},
+    {label: "README.md"}
+]}}/>
+
+🧐🧐 The .toml is a dead giveaway that the devs intend for 
+this to be cargo but for python - not that I really mind, pip sucked. 
+
+<CodeSnippet filename="bash">
+```bash 
+    uv add --dev ruff
+    uv add pyreqwest orjson
+```
+</CodeSnippet>
+
+I also added the ruff VSCode extension. Mousing over {} to the left of python 
+in the bottom right should show "Ruff (native)" .  
+
+# Benchmark Plan 
+I plan to run 3 test clients against an axum server limited to 4 threads. 
+
+1. A reqwest.rs client written in rust 
+2. A multithreaded python client using pyreqwest 
+3. A singlethreaded python client using pyreqwest 
+
+Pyreqwest itself is a performant zero-copy wrapper around reqwest.rs, it outperforms 
+urllib by a healthy ~150% for small requests and ~25% for large requests
+according to their [benchmarks](https://github.com/MarkusSintonen/pyreqwest/blob/main/docs/benchmarks.md). 
+
+More importantly it controls the variable of 'everything that isn't python', so we can really see 
+the difference that python's multithreading makes. 
+
+As for the actual test - I'm thinking I can do some sort of find-and-replace api.
+Each python coroutine will read a fixed string from some file, and choose 2 substrings from that file 
+of equal length. It'll then send a request to the server that looks like this:  
+
+<CodeSnippet>
+```typescript
+    let request = {find: string, replace: string, text: string}; 
+    //and get a response like 
+    let response = string;
+    //feel like theres not much sense in json'ing a single string.
+```
+</CodeSnippet>
+
+Since the api uses json we'll also make use of [orjson](https://pypi.org/project/orjson/) for a claimed 500% speedup in json serialization
+in python. 
+
+# Getting Started 
+
+## The Server 
+Setting it up inside of the python project : 
+<CodeSnippet filename="bash">
+```bash 
+    cargo new bench_server
+    cd bench server
+    cargo add axum axum-macros tokio serde serde_json -F tokio/full axum/json serde/derive
+```
+</CodeSnippet>
+
+Lets just start from this hello world template : 
+
+<CodeSnippet filename="bash">
+```rust 
+    use axum::{response::Html, routing::get, Router};
+    use tokio;
+
+    #[tokio::main]
+    async fn main() {
+        // build our application with a route
+        let app = Router::new().route("/", get(handler));
+
+        // run it
+        let listener = tokio::net::TcpListener::bind("127.0.0.1:3000")
+            .await
+            .unwrap();
+        println!("listening on {}", listener.local_addr().unwrap());
+        axum::serve(listener, app).await.unwrap();
+    }
+
+    async fn handler() -> Html<&'static str> {
+        Html("<h1>Hello, World!</h1>")
+    }
+```
+</CodeSnippet>
+
+Just a drop of elbow grease later we have 
+
+<CodeSnippet filename="bash">
+```rust 
+    //run with cargo run -r 
+    use axum::{Router, routing::post, extract::Json};
+    use axum_macros::debug_handler;
+    use serde::Deserialize;
+    use tokio;
+
+    #[tokio::main(flavor="multi_thread", worker_threads=4)]
+    async fn main() {
+        // build our application with a route
+        let app = Router::new().route("/find-and-replace", post(handler));
+
+        // run it
+        let listener = tokio::net::TcpListener::bind("127.0.0.1:3000")
+            .await
+            .unwrap();
+        println!("listening on {}", listener.local_addr().unwrap());
+        axum::serve(listener, app).await.unwrap();
+    }
+    #[derive(Deserialize)]
+    struct FRRequest {find: String, replace: String, text : String}
+
+    #[debug_handler]
+    async fn handler(Json(req): Json<FRRequest>) -> String {
+        return req.text.replace(&req.find,&req.replace);
+    }
+```
+</CodeSnippet>
+
+We're limiting tokio's threadpool size to 4 to prevent the client and server 
+from influencing eachother by taking up all my computer's resources.
+
+Python will also be limited to 4 threads.
+
+<CodeSnippet filename="bash">
+```bash 
+    >cargo run -r 
+
+    #in another terminal
+    >curl localhost:3000/find-and-replace -X POST -H "Content-Type: application/json" -d '{"find":"hello", "replace":"goodbye","text":"hello world"}'
+
+    goodbye world
+```
+</CodeSnippet>
+
+Cool it works. 
+
+## Single Threaded Python Client 
+Welp python isnt happy. 
+
+<blockquote><code>Python Jedi client: couldn't create connection to server.</code></blockquote>
+
+It seems to be caused by this 
+
+<blockquote><code>ImportError: cannot import name 'Str' from 'ast' (/usr/lib64/python3.14/ast.py)</code></blockquote>
+
+In the python vscode extension when it attempts to start the language server. 
+
+Seems like the version on the extensions store is v2024.14.1 and the latest on github is ...
+v2025.18.0. 
+
+Yikes. 
+
+## Detour 
+I tried sideloading an up to date python extension, but it turns out the codium 
+binary from dnf is just incredibly out of date. So I'm uninstalling it. 
+
+I hate having to install snap for just 1 application but since the Codium team's primary 
+target is snap, so be it. 
+
+## Ok Single Threaded Client! For Realsies This Time
+
+I took a stab at writing this and after fixing a few small mistakes I was left with something really puzzling.
+
+<CodeSnippet filename="bash">
+```python 
+    import asyncio
+    from pyreqwest.client import Client, ClientBuilder 
+    from pyreqwest.response import Response
+    import random
+
+    async def main():
+        print("Hello from multithreading-benchmark!")
+        client = make_client()
+        text = load_text('words_100.txt')
+        length = len(text)
+        for i in range(1000):
+            spans = random_spans(length, 8)
+            find = text[spans[0][0]:spans[0][1]]
+            replace = text[spans[1][0]:spans[1][1]]
+            text = await find_and_replace(client,find,replace,text)
+        print(text)
+
+    def make_client() -> Client:
+        return ClientBuilder().error_for_status(True).build()
+
+    def load_text(path: str) -> str:
+        return open("./" + path, 'r').read()
+
+    def random_spans(file_len: int, span_length: int) -> ((int,int),(int,int)):
+        b = random.randrange(span_length , file_len)
+        a = b - span_length
+        d = random.randrange(span_length , file_len)
+        c = d - span_length
+        return ((a,b),(c,d))
+
+    async def find_and_replace(client: Client, find : str, replace : str, text: str) -> str:
+        res = client.post("http://localhost:3000/find-and-replace")
+        res = res.body_json({find,replace,text})
+        res : Response = await res.build().send() 
+        return await res.text()
+
+    if __name__ == "__main__":
+        asyncio.run(main())
+```
+</CodeSnippet>
+
+<blockquote><code>
+    pyreqwest.exceptions.StatusError: ('HTTP status client error', \{'status': 422})
+</code></blockquote>
+
+MDN Says 422 means 'unprocessable entity'.  
+Once again my hubris punishes me for not including tracing (logging) in the server from the start.  
+With that addition made, the server's logs say : 
+
+<blockquote><code>
+    bench_server: request body = "[\" arrival\",\"ght, com\",\"wish, ...
+</code></blockquote>
+
+Thaaats not json. I dont know what that is. 
+
+I assumed because ClientBuilder allows you to set the body with body_json, which takes 'any' 
+as its input, it meant that itd parse the python object into json but that isn't the case. 
+It just sets the content-type header.
+
+So, we get to use orjson afterall. 
+
+<CodeSnippet filename="error">
+```python
+    import orjson
+    
+    def make_client() -> Client:
+        return ClientBuilder().default_headers([('content-type', 'application/json')])\
+                            .error_for_status(True)\
+                            .build()
+
+    async def find_and_replace(client: Client, find : str, replace : str, text: str) -> str:
+        res = await client.post("http://localhost:3000/find-and-replace")\
+            .body_bytes(orjson.dumps({'find':find,'replace':replace,'text':text}))\
+            .build().send() 
+        return await res.text()
+```
+</CodeSnippet>
+
+The '.' completion doesnt work when I split the builder across lines so \\ syntax it is.
+Also turns out python doesnt support variable name captures for dicts , that makes a set.  
+Neat. 
+
+With that everything's working, so lets make some coroutines.
+
+## Benching A Single Thread 
+
+Ok, here's our main function utilizing coroutines.
+
+<CodeSnippet filename="making coroutines">
+```python 
+    async def bench_coroutines(samples,concurrency):
+        print("Benching single threaded async requests")
+        client = make_client()
+        text = load_text('words_100.txt')
+        elapsed = 0
+        for t in range(samples):
+            coroutines = []
+            for i in range(concurrency):
+                coroutines.append(make_coroutine(client, str(text)))
+            start = time.time()
+            _texts = await asyncio.gather(*coroutines)
+            elapsed += time.time()-start
+        print('%4.3fk req/s'%(samples*concurrency/(elapsed)))
+
+    async def make_coroutine(client: Client, text: str) -> str: 
+        length = len(text)
+        for i in range(1000):
+            spans = random_spans(length, 8)
+            find = text[spans[0][0]:spans[0][1]]
+            replace = text[spans[1][0]:spans[1][1]]
+            text = await find_and_replace(client,find,replace,text)
+        return text
 
 ```
 </CodeSnippet>
+
+For our baseline across 10 samples we get a rate of...
+
+**drumroll**
+
+<h2>22.719k requests per second!</h2>
+
+Exciting but in the grand scheme of things actually not too good.   
+Lets see how that compares against doing everything serially.
+
+<CodeSnippet filename="serial benchmark">
+```python 
+    async def bench_serial(samples):
+        print("Benching serial requests")
+        client = make_client()
+        text = load_text('words_100.txt')
+        elapsed = 0
+        start = time.time()
+        for t in range(samples):
+            await make_coroutine(client, str(text))
+        elapsed += time.time()-start
+        print('%4.3fk req/s '%(samples/(elapsed)))
+```
+</CodeSnippet>
+
+<h2>12.441k req/s</h2>
+ 
+Ok neat, so we get almost a 2x speedup just using pythons old coroutines with asyncio.
+
+# Multithreading 
+
+Now for the interesting part - lets test out python's new 'free threads'.
+
+
+<CodeSnippet filename="threads">
+```python 
+    async def bench_threads(threads,concurrency):
+        print("Benching Multithreaded Coroutines")
+        text = load_text('words_100.txt')
+        handles = []
+        start = time.time()
+        for t in range(threads):
+            handles.append(asyncio.to_thread( lambda: make_thread(str(text), concurrency) ))
+        await asyncio.gather(*handles)
+        elapsed = time.time()-start
+        print('%4.3fk req/s'%(((concurrency*threads)/elapsed)))
+
+    #im only doing 4 threads, hence 25 samples.
+    def make_thread(text,concurrency):
+        async def thread():
+            client = make_client()
+            coroutines = []
+            for i in range(concurrency):
+                coroutines.append(make_coroutine(client, str(text)))
+            return await asyncio.gather(*coroutines)
+        asyncio.run(thread())
+```
+</CodeSnippet>
+
+At long last the awaited benchmark.
+We're doing 25k requests per thread with a concurrency of 25, on 4 threads.  
+Lets run it, 
+
+**drumroll**
+
+<h2>15.828k req/s</h2>
+
+That's a bit dissapointing.  
+I wondered for a while if I was doing something wrong...
+
+# Building Python From Source With uv
+
+So it turns out that while python 3.14 supports free threads, it doesn't come with
+the Global Interpreter Lock disabled by default. It needs to be compiled from source 
+with some specific option set for that to be the case. 
+
+We can easily use uv to build python with our desired features.
+Run 
+<blockquote>
+    <code>
+        uv python list
+    </code>
+</blockquote>
+To see available versions. I found one named  
+'cpython-3.14.0+freethreaded-linux-x86_64-gnu' so I'll be going with that. 
+
+In a separate terminal - not the one in vscode - run 
+
+<blockquote>
+    <code>
+        uv python install cpython-3.14.0+freethreaded-linux-x86_64-gnu
+    </code>
+</blockquote>
+
+And to run our project with that version of python we can do 
+
+<blockquote>
+    <code>
+        uv run --python cpython-3.14.0+freethreaded-linux-x86_64-gnu python -m main
+    </code>
+</blockquote>
+
+Aaand pyreqwest failed to build. joy.
+This seems to be due to it using an unstable feature in the internal rust code.
+Since we have rust installed already we can default to using the nightly channel just this one time. 
+
+But even with that, things still failed to run. I ended up adapting the code to use ye olde python 
+threading library instead of asyncio threads.
+
+Here's the new code.
+
+<CodeSnippet filename="multithreaded coroutines">
+```python 
+    import threading
+    async def bench_threads(threads,concurrency):
+        print("Benching Multithreaded Coroutines")
+        text = load_text('words_100.txt')
+        handles = []
+        start = time.time()
+        for t in range(threads):
+            handle = threading.Thread(target=make_thread, args=(str(text),concurrency))
+            handle.start()
+            handles.append(handle)
+        for h in handles:
+            h.join()
+        elapsed = time.time()-start
+        print('%4.3fk req/s'%(((concurrency*threads)/elapsed)))
+
+    #im only doing 4 threads, hence 25 samples.
+    def make_thread(text,concurrency):
+        async def thread():
+            client = make_client()
+            tasks = []
+            for i in range(concurrency):
+                tasks.append(make_coroutine(client, str(text)))
+            await asyncio.gather(*tasks)
+        asyncio.run(thread())
+```
+</CodeSnippet>
+
+And at last, lets crack the champagne and enjoy our newfound performance!
+
+<blockquote>
+    <code>
+        \> rustup default nightly  
+        \> PYTHON_GIL=0 uv run --python cpython-3.14.0+freethreaded-linux-x86_64-gnu python -m main  
+        
+        multithreading_benchmark  
+        Benching serial requests  
+        3.162k req/s   
+        Benching single threaded async requests  
+        3.093k req/s  
+        Benching Multithreaded Coroutines  
+        2.232k req/s  
+    </code>
+</blockquote>
+
+Ouch. 
+
+# Random Is The Issue?
+I did some research and according to [this post](https://stackoverflow.com/questions/10021882/make-the-random-module-thread-safe-in-python)
+random is the issue. It shares a single mutex between all the threads and coroutines so it bottlenecks them.  
+I'm not going to bother putting the code here but long story short - giving each thread its own SystemRandom() didn't make a difference.  
+
+# Conclusion
+
+Python's type syntax as well as the improved tooling ecosystem are welcome changes to the language
+but parallelism seems like its ... not very good at the moment. I think the approach is probably wrong.
+
+I could understand not wanting to break existing code or make it racey but ... it did break my existing code,
+that was designed for multithreading! I had to rewrite it anyway!
+
+Just make atomic versions of the datastructures that are safe to be sent across threads, or force them to be 
+cloned like js does for dedicated workers. Synchronizing everything has huge overhead.
+
+Unless they can dramatically cut down on that I really don't expect this to ever be 
+enabled by default. 
+
+Perhaps its more useful in compute than in io heavy workloads? 
+
+I imagine since data-frames from pandas etc. are written in C they probably don't 
+have mutexes around them, and compiling python differently shouldnt change that.
+
+So while you'd probably have to handle race conditions when sharing 
+dataframes across threads, you'd also probably reap better performance gains than you see here.
+
+I'll save that for someone else to write about. 
+
+Thank you for reading!
