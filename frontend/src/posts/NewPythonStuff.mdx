@@ -494,7 +494,7 @@ I did some research and according to [this post](https://stackoverflow.com/quest
 random is the issue. It shares a single mutex between all the threads and coroutines so it bottlenecks them.  
 I'm not going to bother putting the code here but long story short - giving each thread its own SystemRandom() didn't make a difference.  
 
-# Conclusion
+# Conclusion?
 
 Python's type syntax as well as the improved tooling ecosystem are welcome changes to the language
 but parallelism seems like its ... not very good at the moment. I think the approach is probably wrong.
@@ -518,4 +518,160 @@ dataframes across threads, you'd also probably reap better performance gains tha
 
 I'll save that for someone else to write about. 
 
-Thank you for reading!
+# Nevermind!
+
+I slept on this a bit and realized the problem - its async.
+
+When you await a 'coroutine' or whatever your async language chooses to call it, you pass back 
+a function, its state, and something the executor can poll or epoll. Thats how the executor knows 
+what to run next, and where to pick up from. 
+
+If you use synchronous locks in an async context, your executor effectively jams - its stuck waiting
+for the lock to unlock while being unable to run other coroutines. In freethreaded python, literally
+everything locks all the time, so our event loop is hamstrung. Tokio's solution to this is to have 
+their own sync primitives like Tokio::mutex that yield while waiting for the mutex to unlock. 
+
+Tokio's website has a pretty good article on this called [async in depth](https://tokio.rs/tokio/tutorial/async),
+if you're comfortable with rust and want to learn how async works under the hood give it a read.
+
+I'm still not expecting good performance, but lets try ripping all the async bits out. 
+
+# Making Everything Sync 
+
+The code didnt actually have to change very much, I probably could have just found and deleted every instance 
+of 'async' or 'await', aside from cleaning up any calls to asyncio and making pyreqwest use its sync client.
+
+<CodeSnippet filename="multithreaded synchronous">
+```python 
+    from pyreqwest.client import SyncClient as Client, SyncClientBuilder as ClientBuilder
+    from pyreqwest.response import SyncResponse as Response
+    from random import SystemRandom
+    import time
+    import threading
+
+    def main():
+        bench_serial(10)
+        bench_threads(10,10)
+
+    def bench_threads(threads,iters):
+        print("Benching Multithreaded Coroutines")
+        text = load_text('words_100.txt')
+        handles = []
+        start = time.time()
+        for t in range(threads):
+            handle = threading.Thread(target=thread, args=(str(text),iters))
+            handle.start()
+            handles.append(handle)
+        for h in handles:
+            h.join()
+        elapsed = time.time()-start
+        print('%4.3fk req/s'%(((iters*threads)/elapsed)))
+
+    def thread(text, iters):
+        rng = SystemRandom()
+        client = make_client()
+        for i in range(iters):
+            text = make_requests(client, text, rng)
+    
+    def bench_serial(samples: int):
+        print("Benching Serial Requests")
+        client = make_client()
+        text = load_text('words_100.txt')
+        elapsed = 0
+        rng = SystemRandom()
+        rng.seed(1)
+        start = time.time()
+        for t in range(samples):
+            make_requests(client, str(text), rng)
+        elapsed += time.time()-start
+        print('%4.3fk req/s '%(samples/(elapsed)))
+```
+</CodeSnippet>
+
+** Drumroll **
+
+<blockquote>
+    <code>
+        >PYTHON_GIL=0 uv run --python cpython-3.14.0+freethreaded-linux-x86_64-gnu python -m sync  
+        Benching Serial Requests  
+        18.732k req/s   
+        Benching Multithreaded Coroutines  
+        53.031k req/s  
+    </code>
+</blockquote>
+
+There we go! More than twice as fast as our old single threaded version - 
+its using 10 threads but still gains are gains! I actually wonder how high we can push this.
+Lets try 16 threads. 
+
+<blockquote>
+    <code>
+        >PYTHON_GIL=0 uv run --python cpython-3.14.0+freethreaded-linux-x86_64-gnu python -m sync  
+        Benching Serial Requests  
+        19.103k req/s   
+        Benching Multithreaded Coroutines   
+        50.678k req/s  
+    </code>
+</blockquote>
+
+Some happy experimenting like this later, I found that uncapping the server's thread count and altering the 
+client's thread count (between 4 and 16) didn't change things too much.  
+
+# Memory Usage?
+I'm actually coming back to this article to revise my conclusions from an earlier untested assumption : that 
+spawning 1 thread per connection in python would be an unrealistic approach, and would take too much memory.
+
+Lets actually try that and see. 
+
+<CodeSnippet filename="memory bench">
+```python 
+    def main():
+        #bench_serial(10)
+        #bench_threads(10,1)
+        bench_memory([10,100,1000])
+
+    def bench_memory(thread_counts : [int]):
+        for count in thread_counts:
+            tracemalloc.start()
+            bench_threads(count,1)
+            print("%s threads used %d Kb"%(count,tracemalloc.get_traced_memory()[1]/1000))
+            tracemalloc.stop()
+```
+</CodeSnippet>
+
+<blockquote>
+    <code>
+        \>PYTHON_GIL=0 uv run --python cpython-3.14.0+freethreaded-linux-x86_64-gnu python -m sync  
+        
+        Benching Multithreaded Coroutines  
+        23.331k req/s  
+        10 threads used 817 Kb  
+        Benching Multithreaded Coroutines  
+        13.129k req/s  
+        100 threads used 7795 Kb  
+        Benching Multithreaded Coroutines  
+        3.627k req/s  
+        1000 threads used 76732 Kb    
+    </code>
+</blockquote>
+
+Our performance tanks , while the memory usage increases linearly by about 75kb per thread.   
+That might not seem too bad but the performance degradation is the real killer - if the server falls behind,
+it's just going to get slower and slower until eventually the memory fills up and it crashes. 
+
+# New Conclusion
+
+Async and threads are mortal enemies in python! 
+
+Which is a shame, because its not exactly feasible to spawn a new thread for every single connection on a webserver.
+
+Hopefully they find a way to fix that, if our single threaded tests were anything to go by there's about 
+another doubling in performance that could be had here, and loads of savings on memory. 
+
+Maybe they could adopt a fully asynchronous runtime by default then just use async locking instead on all of their 
+hidden synchronization primitives. 
+
+I'll probably do a bit more python in the future - web servers aren't typically what python is good at anyway, maybe next 
+time we'll do some ML.
+
+Thanks for reading!

@@ -1,8 +1,8 @@
 
 export default new Map([
 ["src/posts/1.mdx", () => import("astro:content-layer-deferred-module?astro%3Acontent-layer-deferred-module=&fileName=src%2Fposts%2F1.mdx&astroContentModuleFlag=true")],
-["src/posts/GLSLShaders.mdx", () => import("astro:content-layer-deferred-module?astro%3Acontent-layer-deferred-module=&fileName=src%2Fposts%2FGLSLShaders.mdx&astroContentModuleFlag=true")],
 ["src/posts/EffectivelyInstantaneous.mdx", () => import("astro:content-layer-deferred-module?astro%3Acontent-layer-deferred-module=&fileName=src%2Fposts%2FEffectivelyInstantaneous.mdx&astroContentModuleFlag=true")],
+["src/posts/GLSLShaders.mdx", () => import("astro:content-layer-deferred-module?astro%3Acontent-layer-deferred-module=&fileName=src%2Fposts%2FGLSLShaders.mdx&astroContentModuleFlag=true")],
 ["src/posts/Integrating Sqlite.mdx", () => import("astro:content-layer-deferred-module?astro%3Acontent-layer-deferred-module=&fileName=src%2Fposts%2FIntegrating+Sqlite.mdx&astroContentModuleFlag=true")],
 ["src/posts/MeCaptcha.mdx", () => import("astro:content-layer-deferred-module?astro%3Acontent-layer-deferred-module=&fileName=src%2Fposts%2FMeCaptcha.mdx&astroContentModuleFlag=true")],
 ["src/posts/NQueens.mdx", () => import("astro:content-layer-deferred-module?astro%3Acontent-layer-deferred-module=&fileName=src%2Fposts%2FNQueens.mdx&astroContentModuleFlag=true")],

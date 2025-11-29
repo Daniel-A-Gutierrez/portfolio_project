@@ -166,3 +166,8 @@ copy  ./target/release/portfolio over to ~/server/release/portfolio
     sudo systemctl start portfolio-server
 then in cloudflare enable developer mode turn caching off and on again.
 
+# installing snap
+sudo dnf install snapd 
+sudo systemctl enable snapd
+sudo systemctl enable snapd.apparmor
+sudo snap install snap-store
