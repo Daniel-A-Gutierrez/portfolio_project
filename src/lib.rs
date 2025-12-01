@@ -1,10 +1,13 @@
-#![feature(test)]
-use std::fmt::Display;
+#![feature(test, iter_array_chunks)]
+mod stringvec;
 mod tests;
+mod turing;
+mod trallocator;
 use anyhow::{Result, anyhow, ensure};
 use rusqlite::{self, Connection, OptionalExtension, Row};
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
+use std::fmt::Display;
 
 #[derive(Deserialize, Serialize)]
 pub struct KVSetRequest

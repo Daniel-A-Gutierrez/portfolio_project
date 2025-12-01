@@ -20,11 +20,12 @@ use serde::{Deserialize, Serialize};
 use std::{net::SocketAddr, sync::Arc, time::Duration};
 use tokio::{self, sync::Mutex};
 use tower_http::compression::CompressionLayer;
-use tower_http::decompression::DecompressionLayer;
+use tower_http::decompression::RequestDecompressionLayer;
 use tower_http::services::ServeDir;
 use tower_http::set_header::SetResponseHeaderLayer;
 use tower_http::trace::TraceLayer;
 use tracing::instrument::WithSubscriber;
+use tracing::level_filters::LevelFilter;
 use tracing_subscriber::EnvFilter;
 use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt};
 struct S
@@ -61,22 +62,20 @@ async fn main()
     let state = Arc::new(S { db:       Mutex::new(db),
                              sessions: DashSet::new(), });
 
-    tracing_subscriber::registry().with(EnvFilter::try_from_default_env().or_else(|_| {
-                                            EnvFilter::try_new(&format!("{}=warn,tower_http=debug",
-                                                                        env!("CARGO_CRATE_NAME")))
-                                        })
-                                        .unwrap())
+    tracing_subscriber::registry().with(EnvFilter::from_default_env())
                                   .with(tracing_subscriber::fmt::layer())
                                   .init();
 
-    let api_router = axum::Router::new().route("/kv_set", put(kv_set))
-                                        .route("/kv_get", post(kv_get))
-                                        .route("/kv_json_append", post(kv_json_append))
-                                        .route("/kv_delete", delete(kv_delete))
-                                        //.layer(from_fn_with_state(state.clone(), check_session))
-                                        //.route("/get_session", post(get_session))
-                                        .layer(CompressionLayer::new().quality(tower_http::CompressionLevel::Fastest))
-                                        .with_state(state.clone());
+    let api_router =
+        axum::Router::new().route("/kv_set", put(kv_set))
+                           .route("/kv_get", post(kv_get))
+                           .route("/kv_json_append", post(kv_json_append))
+                           .route("/kv_delete", delete(kv_delete))
+                           //.layer(from_fn_with_state(state.clone(), check_session))
+                           //.route("/get_session", post(get_session))
+                           .layer(CompressionLayer::new().quality(tower_http::CompressionLevel::Fastest))
+                           .with_state(state.clone());
+    //db clearer, until we implement captcha
     tokio::spawn(async move {
         loop
         {
@@ -87,23 +86,26 @@ async fn main()
     });
     let cache_control_layer =
         SetResponseHeaderLayer::appending(header::CACHE_CONTROL,
-                                          HeaderValue::from_str(&format!("max-age:{},public",CACHE_LIFETIME)).unwrap());
-    let page_router = axum::Router::new().fallback_service(ServeDir::new("./frontend/dist"))
-                                         .route("/hello", get(|| async { "hi" }))
-                                         .layer(cache_control_layer)
-                                         .layer(CompressionLayer::new().quality(tower_http::CompressionLevel::Best))
-                                         .layer(CacheLayer::with_lifespan(Duration::from_secs(CACHE_LIFETIME)));
-    let router =
-        axum::Router::new().merge(page_router)
-                           .nest("/api", api_router)
-                           .layer(TraceLayer::new_for_http())
-                           .layer(DecompressionLayer::new())
-                           .into_make_service();
+                                          HeaderValue::from_str(&format!("max-age:{},public",
+                                                                         CACHE_LIFETIME)).unwrap());
+    let page_router =
+        axum::Router::new().fallback_service(ServeDir::new("./frontend/dist"))
+                           .route("/hello", get(|| async { "hi" }))
+                           .layer(cache_control_layer)
+                           .layer(CompressionLayer::new().quality(tower_http::CompressionLevel::Best))
+                           .layer(CacheLayer::with_lifespan(Duration::from_secs(CACHE_LIFETIME)));
+    let router = axum::Router::new().merge(page_router)
+                                    .nest("/api", api_router)
+                                    .layer(TraceLayer::new_for_http())
+                                    .layer(RequestDecompressionLayer::new())
+                                    .into_make_service();
     let config = RustlsConfig::from_pem_file("./secrets/daniel-gutierrez.com.pem", "./secrets/daniel-gutierrez.com.key")
                                 .await
                                 .expect("Failed to parse SSL Certificate");
     println!("Starting Server");
-    let _server = axum_server::bind_rustls(addr,config).serve(router).await.unwrap();
+    let _server = axum_server::bind_rustls(addr, config).serve(router)
+                                                        .await
+                                                        .unwrap();
 }
 
 #[debug_handler]
