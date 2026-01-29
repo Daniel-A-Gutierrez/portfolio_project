@@ -1,0 +1,109 @@
+<mxfile host="app.diagrams.net" agent="Mozilla/5.0 (X11; Linux x86_64; rv:148.0) Gecko/20100101 Firefox/148.0" version="29.3.6">
+  <diagram id="C5RBs43oDa-KdzZeNtuy" name="Page-1">
+    <mxGraphModel dx="818" dy="1224" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="600" pageHeight="600" math="0" shadow="0">
+      <root>
+        <mxCell id="WIyWlLk6GJQsqaUBKTNV-0" />
+        <mxCell id="WIyWlLk6GJQsqaUBKTNV-1" parent="WIyWlLk6GJQsqaUBKTNV-0" />
+        <mxCell id="WIyWlLk6GJQsqaUBKTNV-3" parent="WIyWlLk6GJQsqaUBKTNV-1" style="rounded=1;whiteSpace=wrap;html=1;fontSize=12;glass=0;strokeWidth=1;shadow=0;spacing=4;" value="Player 1 and 2 auto subscribe to events where &#39;target == self&#39;" vertex="1">
+          <mxGeometry height="60" width="160" x="100" y="190" as="geometry" />
+        </mxCell>
+        <mxCell id="pPxAgyPnXTIdro9BC8XC-17" edge="1" parent="WIyWlLk6GJQsqaUBKTNV-1" source="pPxAgyPnXTIdro9BC8XC-0" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;entryX=0;entryY=0.5;entryDx=0;entryDy=0;" target="pPxAgyPnXTIdro9BC8XC-14">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="pPxAgyPnXTIdro9BC8XC-0" parent="WIyWlLk6GJQsqaUBKTNV-1" style="rounded=1;whiteSpace=wrap;html=1;fontSize=12;glass=0;strokeWidth=1;shadow=0;spacingLeft=2;spacingTop=2;spacing=4;spacingRight=2;" value="Player 2 Subscribes to &#39;allies within 30ft are attacked&#39;, with a &#39;pre&#39; ordering and a callback" vertex="1">
+          <mxGeometry height="70" width="170" x="90" y="270" as="geometry" />
+        </mxCell>
+        <mxCell id="pPxAgyPnXTIdro9BC8XC-19" edge="1" parent="WIyWlLk6GJQsqaUBKTNV-1" source="pPxAgyPnXTIdro9BC8XC-1" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;entryX=0;entryY=0.5;entryDx=0;entryDy=0;" target="pPxAgyPnXTIdro9BC8XC-18">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="pPxAgyPnXTIdro9BC8XC-1" parent="WIyWlLk6GJQsqaUBKTNV-1" style="rounded=1;whiteSpace=wrap;html=1;fontSize=12;glass=0;strokeWidth=1;shadow=0;align=left;spacingTop=2;spacingLeft=2;" value="&lt;div align=&quot;left&quot;&gt;Goblin dispatches an event like&amp;nbsp;&lt;br&gt;&amp;nbsp;{&amp;nbsp;&lt;br&gt;&amp;nbsp; &amp;nbsp; &amp;nbsp;target : player1,&amp;nbsp;&lt;br&gt;&amp;nbsp; &amp;nbsp; &amp;nbsp;type : attack,&amp;nbsp;&lt;br&gt;&amp;nbsp; &amp;nbsp; &amp;nbsp;info : { roll : 12, dmg : 8 }&amp;nbsp;&lt;br&gt;&amp;nbsp;}&lt;/div&gt;" vertex="1">
+          <mxGeometry height="130" width="160" x="100" y="360" as="geometry" />
+        </mxCell>
+        <mxCell id="pPxAgyPnXTIdro9BC8XC-3" edge="1" parent="WIyWlLk6GJQsqaUBKTNV-1" source="WIyWlLk6GJQsqaUBKTNV-3" style="rounded=0;html=1;jettySize=auto;orthogonalLoop=1;fontSize=11;endArrow=block;endFill=0;endSize=8;strokeWidth=1;shadow=0;labelBackgroundColor=none;edgeStyle=orthogonalEdgeStyle;" target="pPxAgyPnXTIdro9BC8XC-2" value="">
+          <mxGeometry relative="1" as="geometry">
+            <mxPoint x="260" y="215" as="sourcePoint" />
+            <mxPoint x="474" y="330" as="targetPoint" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="pPxAgyPnXTIdro9BC8XC-9" edge="1" parent="WIyWlLk6GJQsqaUBKTNV-1" source="pPxAgyPnXTIdro9BC8XC-2" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;" target="pPxAgyPnXTIdro9BC8XC-8">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="pPxAgyPnXTIdro9BC8XC-10" edge="1" parent="WIyWlLk6GJQsqaUBKTNV-1" source="pPxAgyPnXTIdro9BC8XC-2" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;" target="pPxAgyPnXTIdro9BC8XC-8" value="">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="pPxAgyPnXTIdro9BC8XC-2" parent="WIyWlLk6GJQsqaUBKTNV-1" style="rounded=1;whiteSpace=wrap;html=1;fontSize=12;glass=0;strokeWidth=1;shadow=0;" value="Event System" vertex="1">
+          <mxGeometry height="40" width="120" x="360" y="200" as="geometry" />
+        </mxCell>
+        <mxCell id="pPxAgyPnXTIdro9BC8XC-8" parent="WIyWlLk6GJQsqaUBKTNV-1" style="rounded=1;whiteSpace=wrap;html=1;" value="Respond with state diff" vertex="1">
+          <mxGeometry height="45" width="130" x="650" y="197.5" as="geometry" />
+        </mxCell>
+        <mxCell id="pPxAgyPnXTIdro9BC8XC-11" parent="WIyWlLk6GJQsqaUBKTNV-1" style="text;html=1;whiteSpace=wrap;strokeColor=none;fillColor=none;align=center;verticalAlign=middle;rounded=0;autosize=1;resizable=0;" value="Resolve 0 Matches" vertex="1">
+          <mxGeometry height="30" width="120" x="505" y="185" as="geometry" />
+        </mxCell>
+        <mxCell id="pPxAgyPnXTIdro9BC8XC-12" edge="1" parent="WIyWlLk6GJQsqaUBKTNV-1" source="pPxAgyPnXTIdro9BC8XC-14" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;" target="pPxAgyPnXTIdro9BC8XC-15">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="pPxAgyPnXTIdro9BC8XC-13" edge="1" parent="WIyWlLk6GJQsqaUBKTNV-1" source="pPxAgyPnXTIdro9BC8XC-14" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;" target="pPxAgyPnXTIdro9BC8XC-15" value="">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="pPxAgyPnXTIdro9BC8XC-14" parent="WIyWlLk6GJQsqaUBKTNV-1" style="rounded=1;whiteSpace=wrap;html=1;fontSize=12;glass=0;strokeWidth=1;shadow=0;" value="Event System" vertex="1">
+          <mxGeometry height="40" width="120" x="370" y="285" as="geometry" />
+        </mxCell>
+        <mxCell id="pPxAgyPnXTIdro9BC8XC-15" parent="WIyWlLk6GJQsqaUBKTNV-1" style="rounded=1;whiteSpace=wrap;html=1;" value="Respond with state diff" vertex="1">
+          <mxGeometry height="45" width="130" x="650" y="282.5" as="geometry" />
+        </mxCell>
+        <mxCell id="pPxAgyPnXTIdro9BC8XC-16" parent="WIyWlLk6GJQsqaUBKTNV-1" style="text;html=1;whiteSpace=wrap;strokeColor=none;fillColor=none;align=center;verticalAlign=middle;rounded=0;autosize=1;resizable=0;" value="Resolve 0 Matches" vertex="1">
+          <mxGeometry height="30" width="120" x="505" y="270" as="geometry" />
+        </mxCell>
+        <mxCell id="pPxAgyPnXTIdro9BC8XC-35" edge="1" parent="WIyWlLk6GJQsqaUBKTNV-1" source="pPxAgyPnXTIdro9BC8XC-18" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;entryX=1;entryY=0.5;entryDx=0;entryDy=0;" target="pPxAgyPnXTIdro9BC8XC-20">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points">
+              <mxPoint x="590" y="380" />
+              <mxPoint x="590" y="460" />
+            </Array>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="pPxAgyPnXTIdro9BC8XC-18" parent="WIyWlLk6GJQsqaUBKTNV-1" style="rounded=1;whiteSpace=wrap;html=1;fontSize=12;glass=0;strokeWidth=1;shadow=0;" value="Event System" vertex="1">
+          <mxGeometry height="40" width="120" x="370" y="360" as="geometry" />
+        </mxCell>
+        <mxCell id="pPxAgyPnXTIdro9BC8XC-34" edge="1" parent="WIyWlLk6GJQsqaUBKTNV-1" source="pPxAgyPnXTIdro9BC8XC-20" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;entryX=0;entryY=0.5;entryDx=0;entryDy=0;" target="pPxAgyPnXTIdro9BC8XC-22">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points">
+              <mxPoint x="350" y="460" />
+              <mxPoint x="350" y="578" />
+            </Array>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="pPxAgyPnXTIdro9BC8XC-20" parent="WIyWlLk6GJQsqaUBKTNV-1" style="rounded=1;whiteSpace=wrap;html=1;" value="&lt;div&gt;Resolve Matches In Order&lt;/div&gt;&lt;div&gt;&lt;br&gt;&lt;/div&gt;&lt;div&gt;1. &#39;allies within 30ft are attacked&#39;&amp;nbsp;&lt;/div&gt;&lt;div&gt;&lt;br&gt;&lt;/div&gt;&lt;div&gt;2. target==player1&lt;/div&gt;" vertex="1">
+          <mxGeometry height="80" width="200" x="370" y="420" as="geometry" />
+        </mxCell>
+        <mxCell id="pPxAgyPnXTIdro9BC8XC-32" edge="1" parent="WIyWlLk6GJQsqaUBKTNV-1" source="pPxAgyPnXTIdro9BC8XC-22" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;entryX=1;entryY=0.5;entryDx=0;entryDy=0;" target="pPxAgyPnXTIdro9BC8XC-31">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points">
+              <mxPoint x="590" y="580" />
+              <mxPoint x="590" y="685" />
+            </Array>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="pPxAgyPnXTIdro9BC8XC-22" parent="WIyWlLk6GJQsqaUBKTNV-1" style="rounded=1;whiteSpace=wrap;html=1;" value="Resolve listener, player 2 takes attack and consumes event, may trigger additional dispatches which attempt to resolve immediately" vertex="1">
+          <mxGeometry height="75" width="200" x="370" y="540" as="geometry" />
+        </mxCell>
+        <mxCell id="pPxAgyPnXTIdro9BC8XC-31" parent="WIyWlLk6GJQsqaUBKTNV-1" style="rounded=1;whiteSpace=wrap;html=1;" value="Event is checked before its fed to next, the event system realizes its &#39;none&#39; and terminates propagation." vertex="1">
+          <mxGeometry height="70" width="200" x="370" y="650" as="geometry" />
+        </mxCell>
+        <mxCell id="pPxAgyPnXTIdro9BC8XC-36" parent="WIyWlLk6GJQsqaUBKTNV-1" style="swimlane;fontStyle=0;childLayout=stackLayout;horizontal=1;startSize=26;fillColor=none;horizontalStack=0;resizeParent=1;resizeParentMax=0;resizeLast=0;collapsible=1;marginBottom=0;whiteSpace=wrap;html=1;" value="Event" vertex="1">
+          <mxGeometry height="90" width="140" x="260" y="50" as="geometry" />
+        </mxCell>
+        <mxCell id="pPxAgyPnXTIdro9BC8XC-37" parent="pPxAgyPnXTIdro9BC8XC-36" style="text;strokeColor=none;fillColor=none;align=left;verticalAlign=top;spacingLeft=4;spacingRight=4;overflow=hidden;rotatable=0;points=[[0,0.5],[1,0.5]];portConstraint=eastwest;whiteSpace=wrap;html=1;" value="&lt;div&gt;Order : Pre, Mod, Post&lt;/div&gt;&lt;div&gt;Source&lt;/div&gt;&lt;div&gt;Targets&lt;/div&gt;&lt;div&gt;Info&lt;/div&gt;" vertex="1">
+          <mxGeometry height="64" width="140" y="26" as="geometry" />
+        </mxCell>
+        <mxCell id="pPxAgyPnXTIdro9BC8XC-40" parent="WIyWlLk6GJQsqaUBKTNV-1" style="swimlane;fontStyle=0;childLayout=stackLayout;horizontal=1;startSize=26;fillColor=none;horizontalStack=0;resizeParent=1;resizeParentMax=0;resizeLast=0;collapsible=1;marginBottom=0;whiteSpace=wrap;html=1;" value="Event System" vertex="1">
+          <mxGeometry height="110" width="140" x="100" y="50" as="geometry" />
+        </mxCell>
+        <mxCell id="pPxAgyPnXTIdro9BC8XC-41" parent="pPxAgyPnXTIdro9BC8XC-40" style="text;strokeColor=none;fillColor=none;align=left;verticalAlign=top;spacingLeft=4;spacingRight=4;overflow=hidden;rotatable=0;points=[[0,0.5],[1,0.5]];portConstraint=eastwest;whiteSpace=wrap;html=1;" value="&lt;div&gt;Subscribers&lt;/div&gt;&lt;div&gt;Action Log&lt;/div&gt;&lt;div&gt;Game State&lt;/div&gt;&lt;div&gt;Step&lt;/div&gt;&lt;div&gt;Diffs&lt;/div&gt;" vertex="1">
+          <mxGeometry height="84" width="140" y="26" as="geometry" />
+        </mxCell>
+      </root>
+    </mxGraphModel>
+  </diagram>
+</mxfile>

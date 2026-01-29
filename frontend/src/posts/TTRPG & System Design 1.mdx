@@ -1,0 +1,620 @@
+---
+title : "Designing A TTRPG"
+description : "Exploring System Design With TTRPGs"
+preview : "/previews/lobster.svg"
+postnum : 9
+layout : '../layouts/ArticleLayout.astro'
+published : '1/15/2026'
+tags : ['Languages','Game Programming']
+draft : false
+---
+
+import CodeSnippet from '/src/components/CodeSnippet.astro';
+import ArticleImage from '../components/ArticleImage.astro';
+import delve_online from '/src/images/game dev/delve_online.png';
+import delve_performance from '/src/images/game dev/delve_performance.png';
+import godot_editor from '/src/images/game dev/godot editor.png';
+import godot_signals from '/src/images/game dev/godot_signals.png';
+
+I want to make a game.  
+A tabletop style video game.  
+I've actually been working on this very intermittently for a long time - never programming, only designing.
+Now that I feel like I'm ready to take a stab at programming it, I'm confronted with the question - whats 
+important to me? 
+
+I think the answers to that are extensibility, performance, and stability. 
+
+- I want the program to be extendable by users - mods, user generated content, etc. 
+- It should perform better than roll20 and foundry vtt, enabling 120hz 4k on an igpu ideally. 
+- I don't want to deal with the constant vulnerabilities and supply chain attacks of node. 
+
+So here's some options 
+
+1. Deno with phaser 
+    - It seems like there's some really cool games made with this, and it has integrations with 
+vite, svelte, vue, and other good ui frameworks so thats promising. 
+    - The performance is poop, im getting 80fps using 70% of my 4070ti for a 2d game that looks like this. 
+    <ArticleImage src={delve_online} width="800px" alt="facepalm"/>
+2. [Lobster](https://aardappel.github.io/lobster/README_FIRST.html) - a programming language made specifically for games!
+    - I tried to find games to demo to test this out but ...  I couldn't. Next. 
+3. Rust with Bevy 
+    - Tons of [examples](https://bevy.org/examples-webgpu/transforms/align/)
+    - Networking with [matchbox](https://johanhelsing.studio/posts/extreme-bevy) using webrtc. 
+4. Unity or Unreal? - lol nah
+5. Dioxus?
+    - [So it seems like dioxus can be embedded in bevy](https://github.com/carlosdp/dioxus-in-bevy/tree/main)? 
+    But bevy has a native UI solution so I don't think I'll bother unless it really sucks. 
+    - This library also comes with lots of red tape so for now I'll avoid.
+6. [Godot](https://godotengine.org/)
+    - Comes with a scripting language, an editor, renderer, audio, and probably a broader community than Bevy.
+
+# Lets Try Them Out
+
+Well no point in further ruminating, lets build something and test these out.
+
+# Bevy 
+
+<CodeSnippet filename='bash'>
+```
+    mkdir bevy-trial
+    cd bevy-trial 
+    cargo init . 
+    cargo add bevy 
+    #linux dependencies : https://github.com/bevyengine/bevy/blob/latest/docs/linux_dependencies.md
+    sudo dnf install gcc-c++ libX11-devel alsa-lib-devel systemd-devel
+```
+</CodeSnippet>
+
+I'm also copying over rust-toolchain.toml and .rustfmt.toml from my workspace.
+
+This is recommended to speed up builds
+<CodeSnippet filename='cargo.toml'>
+```toml
+#dont ship with dynamic_linking enabled, it decreases performance.
+[dependencies]
+bevy = { version = "0.18.0", features = ["dynamic_linking"] }
+
+# Enable a small amount of optimization in the dev profile.
+[profile.dev]
+opt-level = 1
+
+# Enable a large amount of optimization in the dev profile for dependencies.
+[profile.dev.package."*"]
+opt-level = 3
+
+```
+</CodeSnippet>
+
+There's [other stuff](https://bevy.org/learn/quick-start/getting-started/setup/) like using lld or mold instead of the default rust linker but until I get annoyed by 
+my compile times im not going to bother.
+
+...
+
+Ok the first compile took 3m 28s. Ouch. I know itll be faster after but it gave me enough time to just do the
+other steps so lets see how much of a difference they made. 
+
+... 
+
+While this is running, I may as well enumerate the other steps. 
+
+- install mold 
+- re-disable dynamic linking 
+- using nightly rustc, enable generic monomorphization sharing between crates. 
+
+...
+
+Ok 2m 53s. I suppose thats a good bit faster. 
+
+## Ok Onto Programming 
+
+<CodeSnippet filename='main.rs'>
+``` rust 
+use bevy::prelude::*;
+
+fn main() {
+    App::new().run();
+}
+
+```
+</CodeSnippet>
+
+According to the guide, the app stores a World, a Schedule, and a Runner.  
+The world stores the data, the schedule stores the systems that operate on the data, and the runner
+interprets the schedule to do hand wavey shit. 
+
+## ECS 
+
+"All app logic in Bevy uses the Entity Component System paradigm, which is often shortened to ECS. ECS is a software pattern that involves breaking your program up into Entities, Components, and Systems. Entities are unique "things" that are assigned groups of Components, which are then processed using Systems.
+
+For example, one entity might have a Position and Velocity component, whereas another entity might have a Position and UI component. Systems are logic that runs on a specific set of component types. You might have a movement system that runs on all entities with a Position and Velocity component.
+
+The ECS pattern encourages clean, decoupled designs by forcing you to break up your app data and logic into its core components. It also helps make your code faster by optimizing memory access patterns and making parallelism easier."
+
+The guide for this section is dense, well written, and not super relevant unless you want to get into the weeds of bevy specifically.
+
+[Source Here](https://bevy.org/learn/quick-start/getting-started/ecs/)
+
+## Plugins 
+
+Bevy is super modular. The renderer, ui, and probably networking are all available as plugins which you add to 
+your app with 'app.add_plugins(plugin)' . 
+
+Bevy comes with [default plugins](https://docs.rs/bevy/latest/bevy/struct.DefaultPlugins.html), but theres also third party ones available through crates.io and listed on 
+the assets page.
+
+Theres also minimal plugins. Lets look what they all bring to the table. 
+
+Default Plugins 
+- PanicHandler
+- Camera 
+- Logging 
+- TaskPool - for async and compute heavy tasks. 
+- FrameCounter
+- Timer 
+- Transform 
+- Diagnostics 
+- Input 
+- ScheduleRunner 
+- WindowPlugin 
+- DlssInitPlugin 
+- Sprite 
+- Txt 
+- Ui 
+- Pbr 
+- Gltf (compressed textures)
+- Lights 
+- Gizmos 
+- States 
+- Hot Patching 
+- Picking - for clicking things with a mouse. 
+
+Many of these are feature gated but on by default. 
+While I'm looking at the features, some notable ones that AREN'T enabled by default : 
+- dev (file watcher, debug, bevy_dev_tools, probably for engine dev )
+- dynamic linking 
+- flac (for audio) 
+- gif 
+- hotpatching 
+- keyboard?
+- libm 
+- meshlet (compute shaders?)
+- mouse 
+- pbr_light_textures 
+- serialize 
+- zlib 
+- http 
+
+Minimal Plugins only has 
+- TaskPool 
+- Frame Count 
+- Time 
+- Schedule Runner 
+- CI testing 
+
+Ok I guess as an exercise we're now moving all our hello logic into a plugin. 
+
+<CodeSnippet filename='bash'>
+```rust 
+pub struct HelloPlugin;
+
+impl Plugin for HelloPlugin {
+    fn build(&self, app: &mut App) {
+        app.add_systems(Startup, add_people);
+        app.add_systems(Update, (hello_world, (update_people, greet_people).chain()));
+    }
+}
+
+
+fn main() {
+    App::new()
+        .add_plugins(DefaultPlugins)
+        .add_plugins(HelloPlugin)
+        .run();
+}
+
+```
+</CodeSnippet>
+
+Running that yields a grey window and a spam of console messages!
+It's got an event loop now thanks to default plugins. 
+To fix the spam we need to use 
+
+## Resources
+
+Resources are like uniforms in shaders, I guess. Globally unique data. 
+
+<CodeSnippet filename='bash'>
+```rust 
+/// Expects a Time resource and a GreetTimer.
+/// The greet timer will be added by us and configured to be a repeating 1 second timer.
+fn greet_people(time : Res<Time>, mut timer : ResMut<GreetTimer>, query: Query<&Name, With<Person>>) {
+    if timer.0.tick(time.delta()).just_finished() {
+        for name in &query {
+            println!("hello {}!", name.0);
+        }
+    }
+}
+
+#[derive(Resource)]
+struct GreetTimer(Timer);
+
+impl Plugin for HelloPlugin {
+    fn build(&self, app: &mut App) {
+        app.insert_resource(GreetTimer(Timer::from_seconds(1.0, TimerMode::Repeating)));
+        app.add_systems(Startup, add_people);
+        app.add_systems(Update, (update_people, greet_people).chain());
+    }
+}
+
+```
+</CodeSnippet>
+
+
+## The End 
+Thats the bevy quick start guide!  
+More to do [here](https://bevy.org/learn/quick-start/next-steps/). 
+
+Lets take a stab at whatever godot's quick start guide has to offer next.
+
+# Godot Trial
+
+Ok its just an executable, no installation or anything. Not a huge fan of that but at least its simple. 
+
+Right off the bat we're presented with a choice to select a renderer.
+
+I'm going compatibility since cross platform is the goal.
+
+There's a [tutorial](https://gdquest.github.io/learn-gdscript/?ref=godot-docs) for their scripting language,
+I'm not going to focus on that right now. 
+
+Ok finally some insight on the design of the engine : "In godot a game is a tree of nodes that you group 
+together into scenes... they can communicate using signals."
+
+- A scene is like a prefab in unity - its just a group of things. They can be nested.
+
+- Nodes are like game objects, and they can have preset nodes added to them such as Camera2D, Sprite2D, etc. 
+
+- Signals are emmitted by nodes when an event occurs.  
+Theyre basically user defined events that can be listened for by other nodes.  
+
+Scenes can inherit other scenes - you can make a wizard scene that inherits from character, to establish
+an inheritance hierarchy. 
+
+## The Editor 
+
+<ArticleImage src={godot_editor} width="1000px" alt="facepalm"/>
+
+There's an assets tab !
+Also apparently [GDShader.com](gdshader.com) allows people to upload and share shaders?   
+Sounds super cool but unfortunately they only have a whopping total of 9 shaders available...
+
+The 5 main panels are mostly familiar from unity, but the inclusion of a code editor in engine is neat.   
+There's also a built in reference in the editor that can be opened with f1. 
+
+The godot editor is apparently made with godot, promising for the UI features.
+
+## Example Project  
+
+### Instancing 
+
+Using this [starter](https://github.com/godotengine/godot-docs-project-starters/releases/download/latest-4.x/instancing_starter.zip), 
+. 
+
+Instancing is what Godot calls instantiating a scene.
+You can either use the 'link' button at the top of the scene graph, or just click and drag the scene onto a node as 
+a child. 
+
+F5 runs the scene. 
+
+You can edit an instance in the following ways 
+- Changing a single instance: doesnt affect others 
+- Changing the scene its instantiated from: affects all instances. 
+
+So basically the same as unity.  
+Honestly apart from the naming of things and having a dedicated script editor and scripting language, this really
+feels exactly the same as unity.
+
+### Scripting 
+
+OK onto some meat.  
+
+We've made a new scene and placed a sprite2D as its root, and attached a script to it.  
+Our script extends sprite2D, and all its transitive parents by extension.  
+A script that extends nothing still extends RefCounted for memory management purposes.  
+We can see the properties we have access to on the right - texture, node2d, canvasitem, and node in this case. 
+<CodeSnippet filename='Sprite2D.gd'>
+```gdscript
+    extends Sprite2D
+
+    func _init():
+	    print("hello world");
+```
+</CodeSnippet>
+
+GDscript uses snake_case, though the editor will process that into Title Case. 
+GDscript files are implicitly classes.
+
+We're gonna make our sprite spin around or something.  
+We'll define its speed and angular speed, then utilize them in the _process() function - 
+godot's eqivalent of Update - which is passed the delta time each frame.
+
+### Reading Input 
+
+The next section has us reading input to move the sprite around like this.
+
+<ArticleImage alt="moving sprite" width="600px" height="400px" src="https://docs.godotengine.org/en/stable/_images/scripting_first_script_moving_with_input.gif"/>
+<br/>
+<CodeSnippet filename='bash'>
+```gdscript
+    extends Sprite2D
+
+    var speed = 400
+    var angular_speed = PI
+
+    func _process(delta):
+        var direction = 0
+        if Input.is_action_pressed("ui_left"):
+            direction = -1
+        if Input.is_action_pressed("ui_right"):
+            direction = 1
+
+        rotation += angular_speed * direction * delta
+        var velocity = Vector2.ZERO
+        if Input.is_action_pressed("ui_up"):
+            velocity = Vector2.UP.rotated(rotation) * speed
+        position += velocity * delta
+
+```
+</CodeSnippet>
+
+## Signals 
+
+Scripts can define types of signals.  
+Instances then register listeners to signals they emit, and listeners provide a callback with 
+the same name that is called when the signal is emitted. 
+
+The UI is used to connect these things together, note the entry on the right for our button and the 
+callback in the script within the editor. 
+
+<ArticleImage src={godot_signals} width="1000px" alt="godot editor screenshot"/>
+
+
+# Review 
+
+OK it seems like both options are good, I don't think there's a wrong choice. 
+
+I feel like I already know godot since its so similar to unity.  
+With that said, I like how bevy forces me to think in systems rather than objects.  
+I also feel like itd be a more worthwhile learning experience. 
+
+# Designing A Tabletop 
+
+Ok, lets think about what we need for this game and if we can establish some sort of hierarchy.  
+
+<img src='/images/drawio/TTRPG System.drawio.svg' width="100%"/>
+
+# UX
+
+I'm thinking of this sort of experience :
+
+## 1. Prep
+GM creates a 'project', equivalent to a structured folder.  
+GM invites other players into their game with steam invites / special key.  
+Each player gets a folder in the project they can build in, the editor doesn't allow edits outside their folder.  
+GM adds a map, slices it, adds walls, doors, music, lights, triggers, and units. 
+GM will probably want to create new and unique items/spells/abilities/classes/races. 
+
+## 2. Character Creation 
+Can't assume players will only be controlling humans or player characters, they could be basically any creature. 
+The list of resources that can be used in character creation is defined by the system and extended by the GMs. 
+The exact properties of a player character are defined in the rules.
+
+## 3. Gameplay 
+The game is always running a 'subsystem'.
+The subsystem determines who can act when, what actions are available, how actions resolve.
+For example, in free movement you can do basically anything and there's no turn order.
+In combat there's a plan->resolve flow, or a sequential turn order 
+In investigation certain object interactions become available.
+etc.  
+
+## 4a. Sequential Combat 
+Lets work out a normal sequential system first, then I'll try the 'plan -> resolve' system. 
+Lets assume there's some sort of 'rules server' that stores the game state and runs the game loop.
+The 'combat runner' would be a state of the rule server.
+The combat runner requests actions from the actor until it submits a 'end turn', is rendered unable to act, 
+or some timeout is reached,
+then it moves on to the next until only 1 faction remains or until no units are in the turn order. 
+
+## 4b. Parallel Combat 
+All units plan their turn at the same time. 
+A 'plan' acts on the world as it is at the end of the previous round. 
+Players can add contingincies to their plan using 1 AP to react to a potential trigger - ie , 'attack another guy instead
+if the first one is already dead'.  
+During 'planning' players can insert 'theoretical' objects that don't exist yet, but that they can expect may exist. 
+IE two players formulate a plan to throw a bag, have the other player recieve it and do something with it in 1 round. 
+The second player needs to insert a theoretical version of the bag to act on on their turn, and if it isnt realized then 
+they need to plan a contingency for that or just lose the opportunity to act for the rest of their turn. 
+The turns resolve either in a semi random order or in order of the player character's haste stat. 
+
+## Abstractions 
+Actors should know how to 
+- take a turn
+    - use abilities 
+    - move 
+    - interact 
+- make a plan 
+
+Damageable  
+- take and calculate damage 
+- die / break 
+- come back from death 
+
+Holder 
+- contain items 
+- be sealed / locked 
+
+Trigger 
+- dispatch an event when a condition is met 
+- listen for events 
+- interrupts a turn but isnt in turn order. 
+
+Dynamic 
+- Have behaviors attached to it which dispatch and listen for dynamic events, and execute actions. 
+- I think I might be able to create a 'behavior' struct that builder-pattern's up an event. 
+
+Perhaps its best to just make every behavior an abstraction and then see how they can be grouped into 
+traits.
+
+## Event System
+
+I think the only feasible way to architecture something like this is with an event system.
+Subscribers need to be able to list various criteria to match events on, and we need some ordering for 
+the things that happen because of the event. 
+
+For example, if we have an ability that says 'if any allied unit within 30 feet would take damage, instead redirect that 
+damage to this unit'. 
+
+Maybe actually we just have a 'pre damage' and a 'post damage' event? 
+Or should every event have a 'pre, mod, and post' parameter for the action?
+
+So dispatching an event is equivalent to interrupting the control flow and leaving the function body to go to the 
+event router, which in turn finds all the applicable listeners, executes the 'pre' events, then the 'mod' events, 
+and lastly the 'post' events, then returns to the event dispatcher.   
+
+The event itself either has to be mutable or have a callback, but I lean towards mutability. 
+
+Lets trace the flow of logic that must have to occur.
+
+<img src="/images/drawio/EventSystem.drawio.svg" width="100%" role="img"/>
+
+This seems like it could be a big performance sink if I can't optimize it somehow, and DEFINITELY a place where 
+deadlocks and stack overflows can occur. 
+
+I also fully expect the borrow checker to HATE this.  
+I'm making a lot of assumptions here - that listeners are all owned by the event system but point towards 
+a valid 'owner', effectively meaning the event system references a bunch of stuff it will outlive.   
+The event system cant own the entitites, theyre owned by ECS.   
+So I have to read up on doing a singleton in bevy.   
+I'm also assuming that all this is going to be run on a single thread and be unparallelizable meaning I'll be fighting the borrow checker fruitlessly, because I don't 
+plan on parallelizing any of this.   
+I also wouldn't mind making the calls to the event system async so we're not blocking rendering while we wait for a turn to resolve so thats another thing to look into.  
+
+I'm going to give bevy a chance here but Godot's architecture might suit this better - it has tasks and jobs and signals built in afterall.  
+
+## Async Bevy ? 
+
+While it does seem like bevy has tools like 'ComputeTaskPool' and 'IOTaskPool' for handling async or compute heavy work outside of the render thread, 
+I think I would rather just spawn a separate thread and communicate with it over channels.  
+
+Actually, I think that forced division of logic might be a good thing - the game has to be client-server based anyway.  
+I can just make the game server the event system , and let the client just worry about communicating with the server.  
+It's a turn based game so I dont need rollback, and for movement the server can just send a volume that the player can traverse ahead of time so the client doesn't have to ask.  
+
+From the client's perspective, a unit is just a token that can move and display its health or whatever.
+
+The game server will get all the complex state. 
+
+I don't want to use http requests and responses for this though, thats a lot of unnecessary latency. 
+We have WebRTC for a persistent connection instead, lets investigate that. 
+
+...
+
+It seems like [it just sends bytes](https://github.com/johanhelsing/matchbox/blob/main/bevy_matchbox/examples/hello_host.rs).  
+Pretty barebones, I suppose that leaves me some freedom though. 
+
+## Networking With Matchbox and GGRS
+Theres a [tutorial](https://johanhelsing.studio/posts/extreme-bevy) that goes through the making of an entire webgame with this tech, lets look into it.  
+
+<img src="/images/drawio/ggrs.drawio.svg" width="100%"/>
+
+Ok so matchbox is just used to set up the initial connection, then we hand things over to ggrs.  
+GGRS handles taking input and doing rollback instead of state synchronization.  
+It works on the assumption that given the same inputs, each client will deterministically reach the same state.   
+This comes with a cost of incurring latency and extra computation but lowers actual network usage.  
+What 'input' constitutes is up to me though, so I could theoretically stuff every possible player action into some 'input' type.  
+There are times where I should care about doing rollback, but being a turn based game, its not often.  
+
+What I would prefer is 
+1. 'player acts, client responds immediately and sends action to server' -> 
+2. 'server responds with state diff -- eventually' -> 
+3. 'client local state is updated with servers'.
+
+## Big Problem
+My concern here is that the client is supposed to be ignorant of the rules, which are implemented by the event system in the game server. 
+So it shouldn't be able to do the rollback because that depends on the client determining the future state of the game based on inputs, which it cant do. 
+So how can we get around this... ? 
+
+1. Mixed Authority
+    - Players have 'authority' over certain objects, like their unit. 
+    - Each client tracks who has authority over what and just trusts them. 
+    - When player 1 moves, it doesn't have to rollback locally because it knows its authoritative, it just tells the other clients what it did.
+    - Player 1 is incapable of doing anything its not authoritative over. 
+    - The host is authoritative over everything else by default, so interactions with the world will incur latency because the clients need to request to do something on the server.
+2. Complex Rollback 
+    - Ordinarily the desired control flow of the game is 
+        - take input, submit actions to event system (asynchronously)
+        - event system updates state (potentially long running),
+        - sends changes to clients 
+        - clients update state
+    - I think the ggrs rollback system works by taking snapshots and keeping a continuous log of inputs from all clients.
+        - Each input is timestamped, so when a client recieves inputs from other clients it can insert, reorder, and resimulate. 
+    - Rolling back needs a way to include the long running calculations the event system is doing. 
+    - The event system should know what 'step' its on, how many input->output loops its gone through, and what all those inputs have been.
+    - It can manually implement a 'rollback' function to go back to a previous 'step' and take new inputs. 
+    - when rolling back it needs to send a reverse diff to the clients of everything that happened thats getting rolled back, so all actions need to be UNDO'able. 
+    - nothing can ever be deleted within the rollback window.
+    - could MAYBE make this system smart enough to tell when a reordering wouldnt affect the final state?
+    - undo is useful during level editing and world building
+
+## Synthesis 
+Maybe taking both of these approaches is best?  
+
+<img src="/images/drawio/Network Graph.drawio.svg" width="100%"/>
+
+Being able to 'go back in time' is a neat feature for the engine.  
+I feel like complex rollback would waste a lot of computation doing unnecessary rollbacks every frame someone moves though, 
+and I have to build an authority system anyway so players can't move eachother's tokens, so it saves me both performance and latency to implement 
+the mixed authority model and just not rollback unless its desired - ie by a player pressing ctrl+z. 
+
+## Actions 
+GGRS works on the principal of 'inputs', but in my game inputs will strictly refer to player input - pressing a button for example.  
+Actions are what the event system will work on, and these are what I intend to synchronize between clients - specifically, between locally running game servers implementing the event system. 
+I think that means that I won't be using ggrs, as the actual networking will operate outside of bevy.  
+I have to think now about the actual syntax of the messages that will be passed around.  
+Lets say we do \{order, subject, action, args\} - command line syntax - and leave the specifics up to the game server to interpret. 
+That way we leave things extensible, mods just have to add actions and their names to add things the player can do. 
+Order is there for reordering on the server's end , it needs to know if clients have inconsistent sequences of events so it can correct that.
+If we're doing the plan->execute game loop, a 'plan' action should consist of a tree of actions, which could just be serialized as a json structure I guess, since it contains conditional logic. 
+
+The game server does its calculations, then sends the delta of the game state to the clients.  
+This means any sort of state information should be serializable, which isn't a problem, just a consideration.  
+
+The server needs to track authority, keeping a list of what units the player can control.
+If the server is local to the client it executes the action and returns a diff ASAP, otherwise it forwards it to the remote to retrieve the diff. 
+If the action is nonsense, it doesnt even make it to the host server, the local game server rejects it. 
+
+Lastly, the diff the host server sends to the clients contains an authoritative log of the actions taken up until the current point. 
+The clients need to check that their current state matches the final state reached by the server, and perform rollback if it doesn't. 
+
+## Thought Experiments
+
+Think of this case - two players are walking next to eachother, and one hits a tripwire. 
+Both clients think they were ahead, and that their player hit the trap and should take damage.  
+Their final states wont match - both players think theyre damaged but only 1 is -  so the server has to decide, even though both players only took 
+actions within their authority, because they interacted with an object they don't have authority over. 
+If some 'roll a save' screen is supposed to pop up, it may flash for one client before the server responds correcting who is making a save.
+
+In another case, imagine some enemy AI are wandering around in free roam. 
+A player moves into their way but after the enemy moved into that same spot on the host. 
+Now the game state is broken due to authority because both units are occupying the same spot. 
+Now we need to rollback, not because theres a disagreement about the game state but because the gamestate is impossible.
+Each action will have to have a timestamp and be able to be rolled back afterall. 
+And we need something to enforce certain invariants about the gamestate, and call for a rollback if theyre broken.
+
+## Good Enough For Me!
+
+Ok well it seems like its time to start coding this, but first I'm going to figure out how I can do 
+some illustrations because all of this text is ... a lot. 
+Thanks for reading this little exercise in system design, I'm looking forward to updating this blog once
+I've got a prototype!
+

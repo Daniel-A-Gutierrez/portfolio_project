@@ -11,4 +11,5 @@ import svelte from '@astrojs/svelte';
 export default defineConfig({
   //image: {service: passthroughImageService()},
   integrations: [mdx(), purgecss(), svelte(), playformCompress()],
+  
 });

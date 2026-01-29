@@ -1,0 +1,85 @@
+<mxfile host="app.diagrams.net" agent="Mozilla/5.0 (X11; Linux x86_64; rv:148.0) Gecko/20100101 Firefox/148.0" version="29.3.6">
+  <diagram name="Page-1" id="obm2I8Ehc_7slorrApes">
+    <mxGraphModel dx="682" dy="1020" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="600" pageHeight="600" math="0" shadow="0">
+      <root>
+        <mxCell id="0" />
+        <mxCell id="1" parent="0" />
+        <mxCell id="tRJE7OsxYcAAuZBqcWqm-1" parent="1" style="swimlane;fontStyle=0;childLayout=stackLayout;horizontal=1;startSize=26;fillColor=none;horizontalStack=0;resizeParent=1;resizeParentMax=0;resizeLast=0;collapsible=1;marginBottom=0;whiteSpace=wrap;html=1;" value="Action" vertex="1">
+          <mxGeometry height="90" width="140" x="230" y="120" as="geometry" />
+        </mxCell>
+        <mxCell id="tRJE7OsxYcAAuZBqcWqm-2" parent="tRJE7OsxYcAAuZBqcWqm-1" style="text;strokeColor=none;fillColor=none;align=left;verticalAlign=top;spacingLeft=4;spacingRight=4;overflow=hidden;rotatable=0;points=[[0,0.5],[1,0.5]];portConstraint=eastwest;whiteSpace=wrap;html=1;" value="Step Number" vertex="1">
+          <mxGeometry height="26" width="140" y="26" as="geometry" />
+        </mxCell>
+        <mxCell id="tRJE7OsxYcAAuZBqcWqm-3" parent="tRJE7OsxYcAAuZBqcWqm-1" style="text;strokeColor=none;fillColor=none;align=left;verticalAlign=top;spacingLeft=4;spacingRight=4;overflow=hidden;rotatable=0;points=[[0,0.5],[1,0.5]];portConstraint=eastwest;whiteSpace=wrap;html=1;" value="Action ( Dynamic, CLI syntax )" vertex="1">
+          <mxGeometry height="38" width="140" y="52" as="geometry" />
+        </mxCell>
+        <mxCell id="tRJE7OsxYcAAuZBqcWqm-5" parent="1" style="swimlane;fontStyle=0;childLayout=stackLayout;horizontal=1;startSize=26;fillColor=none;horizontalStack=0;resizeParent=1;resizeParentMax=0;resizeLast=0;collapsible=1;marginBottom=0;whiteSpace=wrap;html=1;" value="Client Game Server" vertex="1">
+          <mxGeometry height="80" width="140" x="40" y="260" as="geometry" />
+        </mxCell>
+        <mxCell id="tRJE7OsxYcAAuZBqcWqm-6" parent="tRJE7OsxYcAAuZBqcWqm-5" style="text;strokeColor=none;fillColor=none;align=left;verticalAlign=top;spacingLeft=4;spacingRight=4;overflow=hidden;rotatable=0;points=[[0,0.5],[1,0.5]];portConstraint=eastwest;whiteSpace=wrap;html=1;" value="Action Log" vertex="1">
+          <mxGeometry height="26" width="140" y="26" as="geometry" />
+        </mxCell>
+        <mxCell id="tRJE7OsxYcAAuZBqcWqm-7" parent="tRJE7OsxYcAAuZBqcWqm-5" style="text;strokeColor=none;fillColor=none;align=left;verticalAlign=top;spacingLeft=4;spacingRight=4;overflow=hidden;rotatable=0;points=[[0,0.5],[1,0.5]];portConstraint=eastwest;whiteSpace=wrap;html=1;" value="State" vertex="1">
+          <mxGeometry height="28" width="140" y="52" as="geometry" />
+        </mxCell>
+        <mxCell id="tRJE7OsxYcAAuZBqcWqm-15" parent="1" style="text;html=1;whiteSpace=wrap;strokeColor=none;fillColor=none;align=center;verticalAlign=middle;rounded=0;autosize=1;resizable=0;" value="Stream Ordered Actions" vertex="1">
+          <mxGeometry height="30" width="150" x="225" y="260" as="geometry" />
+        </mxCell>
+        <mxCell id="tRJE7OsxYcAAuZBqcWqm-18" parent="1" style="rounded=0;whiteSpace=wrap;html=1;align=left;" value="All actions have to be reversible to do rollback, and trusting client authority over their unit should prevent unnecessary rollbacks in cases where the final state matches." vertex="1">
+          <mxGeometry height="90" width="205" x="195" y="490" as="geometry" />
+        </mxCell>
+        <mxCell id="tRJE7OsxYcAAuZBqcWqm-22" parent="1" style="swimlane;fontStyle=0;childLayout=stackLayout;horizontal=1;startSize=26;fillColor=none;horizontalStack=0;resizeParent=1;resizeParentMax=0;resizeLast=0;collapsible=1;marginBottom=0;whiteSpace=wrap;html=1;" value="Host Client" vertex="1">
+          <mxGeometry height="98" width="140" x="420" y="429" as="geometry" />
+        </mxCell>
+        <mxCell id="tRJE7OsxYcAAuZBqcWqm-23" parent="tRJE7OsxYcAAuZBqcWqm-22" style="text;strokeColor=none;fillColor=none;align=left;verticalAlign=top;spacingLeft=4;spacingRight=4;overflow=hidden;rotatable=0;points=[[0,0.5],[1,0.5]];portConstraint=eastwest;whiteSpace=wrap;html=1;" value="Updates Display To Match State" vertex="1">
+          <mxGeometry height="34" width="140" y="26" as="geometry" />
+        </mxCell>
+        <mxCell id="tRJE7OsxYcAAuZBqcWqm-24" parent="tRJE7OsxYcAAuZBqcWqm-22" style="text;strokeColor=none;fillColor=none;align=left;verticalAlign=top;spacingLeft=4;spacingRight=4;overflow=hidden;rotatable=0;points=[[0,0.5],[1,0.5]];portConstraint=eastwest;whiteSpace=wrap;html=1;" value="Takes inputs and sends actions to game server" vertex="1">
+          <mxGeometry height="38" width="140" y="60" as="geometry" />
+        </mxCell>
+        <mxCell id="tRJE7OsxYcAAuZBqcWqm-27" edge="1" parent="1" source="tRJE7OsxYcAAuZBqcWqm-6" style="endArrow=classic;startArrow=classic;html=1;rounded=0;exitX=1;exitY=0.5;exitDx=0;exitDy=0;entryX=0;entryY=0.5;entryDx=0;entryDy=0;" target="tRJE7OsxYcAAuZBqcWqm-38" value="">
+          <mxGeometry height="50" relative="1" width="50" as="geometry">
+            <mxPoint x="190" y="300" as="sourcePoint" />
+            <mxPoint x="420" y="296.6774193548388" as="targetPoint" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="tRJE7OsxYcAAuZBqcWqm-28" parent="1" style="text;html=1;whiteSpace=wrap;strokeColor=none;fillColor=none;align=center;verticalAlign=middle;rounded=0;autosize=1;resizable=0;" value="&lt;div&gt;Host Responds With State Diff and Action Log&lt;/div&gt;" vertex="1">
+          <mxGeometry height="30" width="270" x="165.5" y="338" as="geometry" />
+        </mxCell>
+        <mxCell id="tRJE7OsxYcAAuZBqcWqm-34" edge="1" parent="1" style="endArrow=classic;startArrow=classic;html=1;rounded=0;entryX=0.493;entryY=0.955;entryDx=0;entryDy=0;entryPerimeter=0;" target="tRJE7OsxYcAAuZBqcWqm-7" value="">
+          <mxGeometry height="50" relative="1" width="50" as="geometry">
+            <mxPoint x="109" y="430" as="sourcePoint" />
+            <mxPoint x="360" y="300" as="targetPoint" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="tRJE7OsxYcAAuZBqcWqm-37" parent="1" style="swimlane;fontStyle=0;childLayout=stackLayout;horizontal=1;startSize=26;fillColor=none;horizontalStack=0;resizeParent=1;resizeParentMax=0;resizeLast=0;collapsible=1;marginBottom=0;whiteSpace=wrap;html=1;" value="Host Game Server" vertex="1">
+          <mxGeometry height="80" width="140" x="420" y="260" as="geometry" />
+        </mxCell>
+        <mxCell id="tRJE7OsxYcAAuZBqcWqm-38" parent="tRJE7OsxYcAAuZBqcWqm-37" style="text;strokeColor=none;fillColor=none;align=left;verticalAlign=top;spacingLeft=4;spacingRight=4;overflow=hidden;rotatable=0;points=[[0,0.5],[1,0.5]];portConstraint=eastwest;whiteSpace=wrap;html=1;" value="&lt;div&gt;Action Log&lt;/div&gt;" vertex="1">
+          <mxGeometry height="26" width="140" y="26" as="geometry" />
+        </mxCell>
+        <mxCell id="tRJE7OsxYcAAuZBqcWqm-39" parent="tRJE7OsxYcAAuZBqcWqm-37" style="text;strokeColor=none;fillColor=none;align=left;verticalAlign=top;spacingLeft=4;spacingRight=4;overflow=hidden;rotatable=0;points=[[0,0.5],[1,0.5]];portConstraint=eastwest;whiteSpace=wrap;html=1;" value="State" vertex="1">
+          <mxGeometry height="28" width="140" y="52" as="geometry" />
+        </mxCell>
+        <mxCell id="tRJE7OsxYcAAuZBqcWqm-40" edge="1" parent="1" source="tRJE7OsxYcAAuZBqcWqm-39" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;entryX=1;entryY=0.5;entryDx=0;entryDy=0;" target="tRJE7OsxYcAAuZBqcWqm-7">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="tRJE7OsxYcAAuZBqcWqm-41" edge="1" parent="1" source="tRJE7OsxYcAAuZBqcWqm-22" style="endArrow=classic;startArrow=classic;html=1;rounded=0;entryX=0.492;entryY=0.968;entryDx=0;entryDy=0;entryPerimeter=0;exitX=0.5;exitY=0;exitDx=0;exitDy=0;" target="tRJE7OsxYcAAuZBqcWqm-39" value="">
+          <mxGeometry height="50" relative="1" width="50" as="geometry">
+            <mxPoint x="470" y="410" as="sourcePoint" />
+            <mxPoint x="520" y="360" as="targetPoint" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="tRJE7OsxYcAAuZBqcWqm-42" parent="1" style="swimlane;fontStyle=0;childLayout=stackLayout;horizontal=1;startSize=26;fillColor=none;horizontalStack=0;resizeParent=1;resizeParentMax=0;resizeLast=0;collapsible=1;marginBottom=0;whiteSpace=wrap;html=1;" value="Client Client" vertex="1">
+          <mxGeometry height="98" width="140" x="40" y="429" as="geometry" />
+        </mxCell>
+        <mxCell id="tRJE7OsxYcAAuZBqcWqm-43" parent="tRJE7OsxYcAAuZBqcWqm-42" style="text;strokeColor=none;fillColor=none;align=left;verticalAlign=top;spacingLeft=4;spacingRight=4;overflow=hidden;rotatable=0;points=[[0,0.5],[1,0.5]];portConstraint=eastwest;whiteSpace=wrap;html=1;" value="Updates Display To Match State" vertex="1">
+          <mxGeometry height="34" width="140" y="26" as="geometry" />
+        </mxCell>
+        <mxCell id="tRJE7OsxYcAAuZBqcWqm-44" parent="tRJE7OsxYcAAuZBqcWqm-42" style="text;strokeColor=none;fillColor=none;align=left;verticalAlign=top;spacingLeft=4;spacingRight=4;overflow=hidden;rotatable=0;points=[[0,0.5],[1,0.5]];portConstraint=eastwest;whiteSpace=wrap;html=1;" value="Takes inputs and sends actions to game server" vertex="1">
+          <mxGeometry height="38" width="140" y="60" as="geometry" />
+        </mxCell>
+      </root>
+    </mxGraphModel>
+  </diagram>
+</mxfile>

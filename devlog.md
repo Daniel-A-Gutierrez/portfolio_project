@@ -151,13 +151,16 @@ then
 
 in dolphin sftp://d@{server_ip}
 copy the files from ./frontend/dist over to ~/server/frontend/dist
+OR DO 
+rsync -a frontend/dist/* d@172.234.252.79:~/server/frontend/dist
+
     ssh d@{server_ip}
     sudo cp -r ~/server/frontend/dist /opt/server/frontend
     sudo systemctl restart portfolio-server
 then in cloudflare enable developer mode to turn off caching
 
 # to update the backend 
-in dolphin sftp://d@{server_ip}
+in dolphin sftp://d@{server_ip} 
 copy  ./target/release/portfolio over to ~/server/release/portfolio
     ssh d@{server_ip}
     sudo systemctl stop portfolio-server

@@ -1,0 +1,311 @@
+---
+title : "Designing A TTRPG"
+description : "Exploring System Design With TTRPGs"
+preview : "/previews/lobster.svg"
+postnum : 9
+layout : '../layouts/ArticleLayout.astro'
+published : '1/15/2026'
+tags : ['Languages','Game Programming']
+draft : false
+---
+
+import CodeSnippet from '/src/components/CodeSnippet.astro';
+import ArticleImage from '../components/ArticleImage.astro';
+
+Ok lets get started programming!  
+With a big project like this I think it's important to break it into testable bits so we can 
+keep our dopamine up. Thats also why I write this blog!  
+So lets set up some goals. 
+
+For now, I just want one entity to damage another.  
+Then I'll see about implementing it with an event system.  
+
+<CodeSnippet filename = 'game_server.rs'>
+```rust 
+    /*
+    mvp : a actor does an action that affects a non actor. 
+    */
+
+    #[derive(PartialEq,Clone)]
+    enum DamageType {
+        True,
+        Fire,
+        All
+    }
+
+    #[derive(Clone)]
+    struct Damage { 
+        amounts : Vec<(DamageType, i64)>
+    }
+
+    //maybe I don't need a trait since everything gets damaged the same way?
+    // pub trait Damageable { 
+    //     //emit an event
+    //     fn damage(&mut self, damage : Damage);
+    // }
+    enum DefenseType {
+        Flat(i64),
+        Ratio(f64) // multiply incoming damage by ratio
+    }
+
+    pub struct Defenses {
+        defenses : Vec<(DamageType,DefenseType)>,
+        hp : i64,
+        max_hp : i64,
+        guard : i64,
+        barrier : i64
+    }
+
+    impl Defenses {
+        fn damage(&mut self, incoming : &Damage) {
+            let mut dmg = incoming.clone();
+            for (dmg_type1,deftype) in &self.defenses {
+                for (dmg_type2,amt) in &mut dmg.amounts {
+                    if dmg_type1 != dmg_type2 { continue ; }
+                    *amt = match deftype {
+                        DefenseType::Flat(f) => (*amt - f).clamp(0, i64::MAX),
+                        DefenseType::Ratio(r) => (*amt as f64 * r).clamp(0.0, i64::MAX as f64) as i64
+                    }
+                }
+            }
+        }
+    }
+
+```
+</CodeSnippet>
+
+Its tempting to wrap Damage up as a big struct like 
+
+<CodeSnippet filename = 'game_server.rs'>
+```rust 
+    struct Damage 
+    {
+        fire : i64,
+        physical : i64, 
+    }
+```
+</CodeSnippet>
+
+etc. BUT then calculating the defenses would require the code to change for each damage type which I 
+don't want to bother with right now. Maybe a macro could do that automatically in the future. 
+
+<CodeSnippet filename = 'game_server.rs'>
+```rust 
+    #[derive(Debug)]
+    pub struct Defenses {
+    ...
+    }
+
+    impl Defenses {
+        ...
+
+        fn default() -> Self 
+        {
+            return Self{ defenses: vec![], hp : 10, max_hp: 10, guard : 0 , barrier : 0 };
+        }
+    }
+
+    #[derive(Debug)]
+    pub struct DamageableActor {
+        defenses : Defenses ,
+        power : i64
+    }
+
+    impl DamageableActor {
+        fn attack(&self, target : &mut Self) 
+        {
+            let atk_dmg = Damage{ amounts : vec![ (DamageType::True, self.power)] };
+            target.defenses.damage(&atk_dmg);
+        }
+    }
+
+
+    #[cfg(test)]
+    mod test
+    {
+        extern crate test;
+        use test::Bencher;
+        use crate::*;
+
+        #[test]
+        fn damage_1()
+        {
+            let mut player = DamageableActor{ defenses : Defenses::default(), power : 4};
+            let mut goblin = DamageableActor { defenses : Defenses::default(), power : 3};
+            while player.defenses.hp > 0 && goblin.defenses.hp > 0 {
+                player.attack(&mut goblin);
+                goblin.attack(&mut player);
+            }
+            dbg!(player);
+            dbg!(goblin);
+        }
+
+        #[bench]
+        fn bencher(b : &mut Bencher) 
+        {
+            b.iter(||{
+
+                });
+        }
+    }
+```
+</CodeSnippet>
+
+Ok lets run it! 
+
+...
+
+Ok its still running ... 
+
+Ah shit forgot to subtract from hp in damage. Ok fixing that and now ..!
+
+<CodeSnippet filename = 'game_server.rs'>
+```rust 
+    running 1 test
+    [src/lib.rs:110:9] player = DamageableActor {
+        defenses: Defenses {
+            defenses: [],
+            hp: 1,
+            max_hp: 10,
+            guard: 0,
+            barrier: 0,
+        },
+        power: 4,
+    }
+    [src/lib.rs:111:9] goblin = DamageableActor {
+        defenses: Defenses {
+            defenses: [],
+            hp: -2,
+            max_hp: 10,
+            guard: 0,
+            barrier: 0,
+        },
+        power: 3,
+    }
+    test test::damage_1 ... ok
+```
+</CodeSnippet>
+
+Yay our player won!
+
+Lets test out some armor on the goblin 
+
+
+<CodeSnippet filename = 'game_server.rs'>
+```rust 
+    #[test]
+    fn damage_1()
+    {
+        let mut player = DamageableActor{ defenses : Defenses::default(), power : 4};
+        let mut armored = Defenses::default();
+        armored.defenses.push( (DamageType::All, DefenseType::Flat(2)) );
+        let mut goblin = DamageableActor { defenses : armored, power : 3};
+        while player.defenses.hp > 0 && goblin.defenses.hp > 0 {
+            player.attack(&mut goblin);
+            goblin.attack(&mut player);
+        }
+        dbg!(player);
+        dbg!(goblin);
+    }
+```
+</CodeSnippet>
+
+<CodeSnippet filename = 'game_server.rs'>
+```rust 
+    running 1 test
+    [src/lib.rs:112:9] player = DamageableActor {
+        defenses: Defenses {
+            defenses: [],
+            hp: 1,
+            max_hp: 10,
+            guard: 0,
+            barrier: 0,
+        },
+        power: 4,
+    }
+    [src/lib.rs:113:9] goblin = DamageableActor {
+        defenses: Defenses {
+            defenses: [
+                (
+                    All,
+                    Flat(
+                        2,
+                    ),
+                ),
+            ],
+            hp: -2,
+            max_hp: 10,
+            guard: 0,
+            barrier: 0,
+        },
+        power: 3,
+    }
+    test test::damage_1 ... ok
+```
+</CodeSnippet>
+
+Wait thats not right ... Ok I didn't factor the 'All' defense type into our calculations, lets 
+fix that and run it back 
+
+<CodeSnippet filename = 'game_server.rs'>
+```rust 
+    fn damage(&mut self, incoming : &Damage) {
+        let mut dmg = incoming.clone();
+        for (dmg_type1,deftype) in &self.defenses {
+            for (dmg_type2,amt) in &mut dmg.amounts {
+                if *dmg_type1 != DamageType::All && dmg_type1 != dmg_type2 { continue ; }
+                *amt = match deftype {
+                    DefenseType::Flat(f) => (*amt - f).clamp(0, i64::MAX),
+                    DefenseType::Ratio(r) => (*amt as f64 * r).clamp(0.0, i64::MAX as f64) as i64
+                }
+            }
+        }
+        self.hp -= dmg.amounts.iter().fold(0, |a,b| a+b.1);
+    }
+```
+</CodeSnippet>
+
+<CodeSnippet filename = 'game_server.rs'>
+```rust 
+
+    [src/lib.rs:112:9] player = DamageableActor {
+        defenses: Defenses {
+            defenses: [],
+            hp: -2,
+            max_hp: 10,
+            guard: 0,
+            barrier: 0,
+        },
+        power: 4,
+    }
+    [src/lib.rs:113:9] goblin = DamageableActor {
+        defenses: Defenses {
+            defenses: [
+                (
+                    All,
+                    Flat(
+                        2,
+                    ),
+                ),
+            ],
+            hp: 2,
+            max_hp: 10,
+            guard: 0,
+            barrier: 0,
+        },
+        power: 3,
+    }
+    test test::damage_1 ... ok
+```
+</CodeSnippet>
+
+Alright! Not gonna lie this is kinda fun for me. 
+Ok just for shits lets give the player some bonus fire damage on their attacks.
+Actually I think this would be a good time to start the event system - I could add an 'on hit' listener 
+when the source is 'player' that adds fire damage to the attack.
+
+<CodeSnippet filename = 'game_server.rs'>
+```rust 
+
+```
+</CodeSnippet>
