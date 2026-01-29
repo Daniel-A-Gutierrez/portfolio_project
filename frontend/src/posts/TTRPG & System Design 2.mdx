@@ -304,6 +304,479 @@ Ok just for shits lets give the player some bonus fire damage on their attacks.
 Actually I think this would be a good time to start the event system - I could add an 'on hit' listener 
 when the source is 'player' that adds fire damage to the attack.
 
+...
+
+OK I ended up doing this all in one sprint so apologies for the giant wall of code here but it works!  
+
+<CodeSnippet filename = 'game_server.rs'>
+```rust 
+    impl DamageableActor {
+        fn attack(&self, target : &mut Self) 
+        {
+            let atk_dmg = Damage{ amounts : vec![ (DamageType::True, self.power)] };
+            target.defenses.damage(&atk_dmg);
+        }
+
+        //im not sure how to implement actions yet so we're just doing events
+        fn act(&self, world : &World) -> Vec<Event>{
+            //find the nearest guy thats not me and hit them
+            let other_id = world.actors.iter().find(|u| u.0 != &self.id);
+            if let Some(target_id) = other_id {
+                return vec!(Event {  source: self.id, 
+                                targets: vec![*target_id.0], 
+                                data: EventData::Attack(Damage{amounts: vec![(DamageType::True, self.power)] })});
+            }
+            return vec![];
+        }
+
+        fn new(id: u64, power: i64, defenses : Defenses) -> Self {
+            return Self{id,power,defenses};
+        }
+    }
+
+
+    /*
+    for the future : 
+    actions have cli syntax that maps to executable functions stored in a map
+    actions result in events and everything is logged and can be rolled back
+
+    for now : 
+
+    */
+    #[derive(Debug)]
+
+    pub struct World {
+        pub actors : HashMap<u64,DamageableActor>,
+    }
+    #[derive(Debug)]
+
+    pub enum EventData {
+        Attack(Damage),
+        Damaged(Damage),
+        Felled
+    }
+
+    #[derive(Debug)]
+    pub struct Event {
+        source : u64,
+        targets : Vec<u64>,
+        data : EventData
+    }
+
+    pub struct EventListener{
+        order : i64,
+        pub matcher : Box<dyn Fn(&Event) -> bool>,
+        pub operator : Box<dyn Fn(&mut World, Event) -> Option<Event>> 
+    }
+
+    pub struct EventSystem 
+    {
+        turn_order : VecDeque<u64>,
+        world : World, 
+        listeners : Vec<EventListener>,
+        turn_counter : u64
+        //plans : Vec
+    }
+
+    //an event system could be a thing thats constructed on combat start
+    //from a subset of units in the world.
+    impl EventSystem {
+        fn start_combat(&mut self) {
+            self.turn_counter = 0;
+            //everything in the world will now engage in a battle to the death
+            self.turn_order = self.world.actors.keys().map(|k|*k).collect::<VecDeque<u64>>();
+            //lets just run till theres only one living unit
+            while self.turn_order.len() > 1{
+                let turn = self.turn_order.pop_front().unwrap();
+                let mut actor = self.world.actors.get(&turn).expect("Actor with turn does not exist");
+                if(0 > actor.defenses.hp) { continue ; }
+                let events = actor.act(&self.world);
+                for event in events {
+                    dbg!(&event);
+                    self.dispatch(event);
+                }
+                //need to relookup to shadow previous actor to make borrow checker happy.
+                let mut actor = self.world.actors.get(&turn).expect("Actor with turn does not exist");
+                if( actor.defenses.hp > 0 ) { self.turn_order.push_back(turn); }
+                self.turn_counter +=1;
+                dbg!(&self.turn_counter);
+                dbg!(&self.world);
+            }
+        }
+
+        fn add_unit(&mut self, power : i64, defenses : Defenses) { 
+            let new_id = self.world.actors.len() as u64;
+            let actor = DamageableActor::new(new_id, power, defenses);
+            self.world.actors.insert(actor.id, actor);
+            self.add_listener(EventListener {
+                order : 0,
+                matcher : Self::attack_matcher(new_id),
+                operator : Self::attack_operator(new_id)
+            });
+        }
+
+        fn dispatch(&mut self, mut e : Event) {
+            for listener in &self.listeners {
+                if (listener.matcher)(&e) {
+                    match (listener.operator)(&mut self.world,e){ 
+                        Some(x) => e = x , 
+                        None => break
+                    }
+                }
+            }
+        }
+
+        fn add_listener(&mut self, listener : EventListener) {
+            self.listeners.push(listener);
+            //this could definitely be improved, probably by using a sorted vec or a tree
+            self.listeners.sort_by(|a,b| a.order.cmp(&b.order));
+        }
+
+        ///match events that are attacks targeting this unit
+        fn attack_matcher(self_id : u64) -> Box<dyn Fn(&Event) -> bool>{
+            return Box::new( move |e : &Event| {
+                match e.data {
+                    EventData::Attack(_) => 
+                        e.targets.iter().find(|u| **u==self_id).is_some(),
+                    _ => false  
+        }});}
+
+        //event listener that damages this unit when an enemy attacks it
+        fn attack_operator(self_id : u64) -> Box<dyn Fn(&mut World, Event) -> Option<Event>> {
+            return Box::new( move |w : &mut World, e : Event| {
+                if  let Some(this) = w.actors.get_mut(&self_id) && 
+                    let EventData::Attack(dmg) = e.data 
+                {
+                    this.defenses.damage(&dmg);
+                }
+                return None;
+            });
+        }
+    }
+
+    ...
+
+    #[test]
+    fn events_1()
+    {
+        let mut evt_sys = EventSystem {listeners : vec![], turn_order : VecDeque::new(), world : World { actors: HashMap::new() }, turn_counter: 0};
+        evt_sys.add_unit( 4,  Defenses::default(), );
+        let mut armored = Defenses::default();
+        armored.defenses.push( (DamageType::All, DefenseType::Flat(2)) );
+        evt_sys.add_unit( 3, armored );
+        evt_sys.add_listener( EventListener { order : -1, matcher: Box::new(|e : &Event| { 
+                // id like a better way of tying the listener to a unit than hard coding an ID
+                return e.source == 0 && (if let EventData::Attack(_) = e.data {true} else {false});
+            }), 
+            operator: Box::new(|w : &mut World, mut e: Event| {
+                if let EventData::Attack(dmg) = &mut e.data {
+                    //add 4 fire damage to attacks coming from our source
+                    dmg.amounts.push( (DamageType::Fire, 4));
+                }
+                return Some(e);
+            })});
+        evt_sys.start_combat();
+        dbg!(evt_sys.world);
+    }
+
+```
+</CodeSnippet>
+
+
+<CodeSnippet filename = 'game_server.rs'>
+```rust 
+    running 1 test
+    [src/lib.rs:161:17] &event = Event {
+        source: 0,
+        targets: [
+            1,
+        ],
+        data: Attack(
+            Damage {
+                amounts: [
+                    (
+                        True,
+                        4,
+                    ),
+                ],
+            },
+        ),
+    }
+    [src/lib.rs:168:13] &self.turn_counter = 1
+    [src/lib.rs:169:13] &self.world = World {
+        actors: {
+            0: DamageableActor {
+                defenses: Defenses {
+                    defenses: [],
+                    hp: 10,
+                    max_hp: 10,
+                    guard: 0,
+                    barrier: 0,
+                },
+                power: 4,
+                id: 0,
+            },
+            1: DamageableActor {
+                defenses: Defenses {
+                    defenses: [
+                        (
+                            All,
+                            Flat(
+                                2,
+                            ),
+                        ),
+                    ],
+                    hp: 6,
+                    max_hp: 10,
+                    guard: 0,
+                    barrier: 0,
+                },
+                power: 3,
+                id: 1,
+            },
+        },
+    }
+    [src/lib.rs:161:17] &event = Event {
+        source: 1,
+        targets: [
+            0,
+        ],
+        data: Attack(
+            Damage {
+                amounts: [
+                    (
+                        True,
+                        3,
+                    ),
+                ],
+            },
+        ),
+    }
+    [src/lib.rs:168:13] &self.turn_counter = 2
+    [src/lib.rs:169:13] &self.world = World {
+        actors: {
+            0: DamageableActor {
+                defenses: Defenses {
+                    defenses: [],
+                    hp: 7,
+                    max_hp: 10,
+                    guard: 0,
+                    barrier: 0,
+                },
+                power: 4,
+                id: 0,
+            },
+            1: DamageableActor {
+                defenses: Defenses {
+                    defenses: [
+                        (
+                            All,
+                            Flat(
+                                2,
+                            ),
+                        ),
+                    ],
+                    hp: 6,
+                    max_hp: 10,
+                    guard: 0,
+                    barrier: 0,
+                },
+                power: 3,
+                id: 1,
+            },
+        },
+    }
+    [src/lib.rs:161:17] &event = Event {
+        source: 0,
+        targets: [
+            1,
+        ],
+        data: Attack(
+            Damage {
+                amounts: [
+                    (
+                        True,
+                        4,
+                    ),
+                ],
+            },
+        ),
+    }
+    [src/lib.rs:168:13] &self.turn_counter = 3
+    [src/lib.rs:169:13] &self.world = World {
+        actors: {
+            0: DamageableActor {
+                defenses: Defenses {
+                    defenses: [],
+                    hp: 7,
+                    max_hp: 10,
+                    guard: 0,
+                    barrier: 0,
+                },
+                power: 4,
+                id: 0,
+            },
+            1: DamageableActor {
+                defenses: Defenses {
+                    defenses: [
+                        (
+                            All,
+                            Flat(
+                                2,
+                            ),
+                        ),
+                    ],
+                    hp: 2,
+                    max_hp: 10,
+                    guard: 0,
+                    barrier: 0,
+                },
+                power: 3,
+                id: 1,
+            },
+        },
+    }
+    [src/lib.rs:161:17] &event = Event {
+        source: 1,
+        targets: [
+            0,
+        ],
+        data: Attack(
+            Damage {
+                amounts: [
+                    (
+                        True,
+                        3,
+                    ),
+                ],
+            },
+        ),
+    }
+    [src/lib.rs:168:13] &self.turn_counter = 4
+    [src/lib.rs:169:13] &self.world = World {
+        actors: {
+            0: DamageableActor {
+                defenses: Defenses {
+                    defenses: [],
+                    hp: 4,
+                    max_hp: 10,
+                    guard: 0,
+                    barrier: 0,
+                },
+                power: 4,
+                id: 0,
+            },
+            1: DamageableActor {
+                defenses: Defenses {
+                    defenses: [
+                        (
+                            All,
+                            Flat(
+                                2,
+                            ),
+                        ),
+                    ],
+                    hp: 2,
+                    max_hp: 10,
+                    guard: 0,
+                    barrier: 0,
+                },
+                power: 3,
+                id: 1,
+            },
+        },
+    }
+    [src/lib.rs:161:17] &event = Event {
+        source: 0,
+        targets: [
+            1,
+        ],
+        data: Attack(
+            Damage {
+                amounts: [
+                    (
+                        True,
+                        4,
+                    ),
+                ],
+            },
+        ),
+    }
+    [src/lib.rs:168:13] &self.turn_counter = 5
+    [src/lib.rs:169:13] &self.world = World {
+        actors: {
+            0: DamageableActor {
+                defenses: Defenses {
+                    defenses: [],
+                    hp: 4,
+                    max_hp: 10,
+                    guard: 0,
+                    barrier: 0,
+                },
+                power: 4,
+                id: 0,
+            },
+            1: DamageableActor {
+                defenses: Defenses {
+                    defenses: [
+                        (
+                            All,
+                            Flat(
+                                2,
+                            ),
+                        ),
+                    ],
+                    hp: -2,
+                    max_hp: 10,
+                    guard: 0,
+                    barrier: 0,
+                },
+                power: 3,
+                id: 1,
+            },
+        },
+    }
+    [src/lib.rs:271:9] evt_sys.world = World {
+        actors: {
+            0: DamageableActor {
+                defenses: Defenses {
+                    defenses: [],
+                    hp: 4,
+                    max_hp: 10,
+                    guard: 0,
+                    barrier: 0,
+                },
+                power: 4,
+                id: 0,
+            },
+            1: DamageableActor {
+                defenses: Defenses {
+                    defenses: [
+                        (
+                            All,
+                            Flat(
+                                2,
+                            ),
+                        ),
+                    ],
+                    hp: -2,
+                    max_hp: 10,
+                    guard: 0,
+                    barrier: 0,
+                },
+                power: 3,
+                id: 1,
+            },
+        },
+    }
+```
+</CodeSnippet>
+
+It lliiiiives - and pretty much exactly as expected on the first try!  
+Honestly this is what makes it hard to go back from rust. 
+Shit just works when the compiler says it does 80% of the time, and the other 18% its not too hard to find 
+out why its broken. 
+
 <CodeSnippet filename = 'game_server.rs'>
 ```rust 
 
