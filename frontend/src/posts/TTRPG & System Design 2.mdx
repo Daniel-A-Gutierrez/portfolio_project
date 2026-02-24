@@ -1,10 +1,10 @@
 ---
-title : "Designing A TTRPG"
+title : "Adventure System : Part 1"
 description : "Exploring System Design With TTRPGs"
-preview : "/previews/lobster.svg"
+preview : "/previews/event-loop.webp"
 postnum : 9
 layout : '../layouts/ArticleLayout.astro'
-published : '1/15/2026'
+published : '2/15/2026'
 tags : ['Languages','Game Programming']
 draft : false
 ---
@@ -12,9 +12,14 @@ draft : false
 import CodeSnippet from '/src/components/CodeSnippet.astro';
 import ArticleImage from '../components/ArticleImage.astro';
 
-Ok lets get started programming!  
+# Prelude 
+I made this more as a devlog to keep myself going while writing the code, be warned, its *really* boring.
+The [repo](https://github.com/Daniel-A-Gutierrez/Adventure-System) continues to be updated after the writing of this post. 
+
+# Getting Started
 With a big project like this I think it's important to break it into testable bits so we can 
-keep our dopamine up. Thats also why I write this blog!  
+keep our dopamine up.  
+Thats also why I write this blog!  
 So lets set up some goals. 
 
 For now, I just want one entity to damage another.  
@@ -43,6 +48,7 @@ Then I'll see about implementing it with an event system.
     //     //emit an event
     //     fn damage(&mut self, damage : Damage);
     // }
+
     enum DefenseType {
         Flat(i64),
         Ratio(f64) // multiply incoming damage by ratio
@@ -101,7 +107,7 @@ don't want to bother with right now. Maybe a macro could do that automatically i
 
         fn default() -> Self 
         {
-            return Self{ defenses: vec![], hp : 10, max_hp: 10, guard : 0 , barrier : 0 };
+            return Self {defenses: vec![], hp : 10, max_hp: 10, guard : 0 , barrier : 0 };
         }
     }
 
@@ -130,7 +136,7 @@ don't want to bother with right now. Maybe a macro could do that automatically i
         #[test]
         fn damage_1()
         {
-            let mut player = DamageableActor{ defenses : Defenses::default(), power : 4};
+            let mut player = DamageableActor { defenses : Defenses::default(), power : 4};
             let mut goblin = DamageableActor { defenses : Defenses::default(), power : 3};
             while player.defenses.hp > 0 && goblin.defenses.hp > 0 {
                 player.attack(&mut goblin);
@@ -186,7 +192,7 @@ Ah shit forgot to subtract from hp in damage. Ok fixing that and now ..!
 ```
 </CodeSnippet>
 
-Yay our player won!
+The player won!
 
 Lets test out some armor on the goblin 
 
@@ -244,7 +250,9 @@ Lets test out some armor on the goblin
 ```
 </CodeSnippet>
 
-Wait thats not right ... Ok I didn't factor the 'All' defense type into our calculations, lets 
+Wait thats not right - the player still won.  
+...  
+Ok I didn't factor the 'All' defense type into our calculations, lets 
 fix that and run it back 
 
 <CodeSnippet filename = 'game_server.rs'>
@@ -307,6 +315,7 @@ when the source is 'player' that adds fire damage to the attack.
 ...
 
 OK I ended up doing this all in one sprint so apologies for the giant wall of code here but it works!  
+Read the comments instead.  
 
 <CodeSnippet filename = 'game_server.rs'>
 ```rust 
@@ -344,18 +353,20 @@ OK I ended up doing this all in one sprint so apologies for the giant wall of co
 
     */
     #[derive(Debug)]
-
+    /// world stores the state, which for now is just all the actors mapped by id. 
     pub struct World {
         pub actors : HashMap<u64,DamageableActor>,
     }
     #[derive(Debug)]
 
+    /// all the different types of events are in an enum (for now)
     pub enum EventData {
         Attack(Damage),
         Damaged(Damage),
         Felled
     }
 
+    /// event wraps the custom data
     #[derive(Debug)]
     pub struct Event {
         source : u64,
@@ -363,12 +374,15 @@ OK I ended up doing this all in one sprint so apologies for the giant wall of co
         data : EventData
     }
 
+    /// listeners have an order, a matcher which returns true if the operator should be run
+    /// *the world can only be modified within operators*
     pub struct EventListener{
         order : i64,
         pub matcher : Box<dyn Fn(&Event) -> bool>,
         pub operator : Box<dyn Fn(&mut World, Event) -> Option<Event>> 
     }
 
+    /// event system runs the game and routes events from actors to listeners. 
     pub struct EventSystem 
     {
         turn_order : VecDeque<u64>,
@@ -390,9 +404,11 @@ OK I ended up doing this all in one sprint so apologies for the giant wall of co
                 let turn = self.turn_order.pop_front().unwrap();
                 let mut actor = self.world.actors.get(&turn).expect("Actor with turn does not exist");
                 if(0 > actor.defenses.hp) { continue ; }
+                /// 'act' now returns a list of events
                 let events = actor.act(&self.world);
                 for event in events {
                     dbg!(&event);
+                    ///the event system dispatches the returned events and executes listeners.
                     self.dispatch(event);
                 }
                 //need to relookup to shadow previous actor to make borrow checker happy.
@@ -455,7 +471,7 @@ OK I ended up doing this all in one sprint so apologies for the giant wall of co
     }
 
     ...
-
+    /// our test function, the output of which we will check next. 
     #[test]
     fn events_1()
     {
@@ -482,26 +498,16 @@ OK I ended up doing this all in one sprint so apologies for the giant wall of co
 ```
 </CodeSnippet>
 
+OK so I've set our test function to log the state of the world after each turn.  
+Lets see what happens when the goblin goes up against a knight with on-hit effects.  
 
 <CodeSnippet filename = 'game_server.rs'>
 ```rust 
     running 1 test
     [src/lib.rs:161:17] &event = Event {
         source: 0,
-        targets: [
-            1,
-        ],
-        data: Attack(
-            Damage {
-                amounts: [
-                    (
-                        True,
-                        4,
-                    ),
-                ],
-            },
-        ),
-    }
+        targets: [1,],
+        data: Attack(Damage {amounts: [(True,4,),],},),}
     [src/lib.rs:168:13] &self.turn_counter = 1
     [src/lib.rs:169:13] &self.world = World {
         actors: {
@@ -514,43 +520,25 @@ OK I ended up doing this all in one sprint so apologies for the giant wall of co
                     barrier: 0,
                 },
                 power: 4,
-                id: 0,
-            },
+                id: 0,},
             1: DamageableActor {
                 defenses: Defenses {
                     defenses: [
-                        (
-                            All,
-                            Flat(
-                                2,
-                            ),
-                        ),
-                    ],
+                        (All,Flat(2,),),],
                     hp: 6,
                     max_hp: 10,
                     guard: 0,
                     barrier: 0,
                 },
                 power: 3,
-                id: 1,
-            },
-        },
-    }
+                id: 1,},},}
     [src/lib.rs:161:17] &event = Event {
         source: 1,
         targets: [
             0,
         ],
         data: Attack(
-            Damage {
-                amounts: [
-                    (
-                        True,
-                        3,
-                    ),
-                ],
-            },
-        ),
+            Damage {amounts: [(True,3,),],},),
     }
     [src/lib.rs:168:13] &self.turn_counter = 2
     [src/lib.rs:169:13] &self.world = World {
@@ -564,18 +552,10 @@ OK I ended up doing this all in one sprint so apologies for the giant wall of co
                     barrier: 0,
                 },
                 power: 4,
-                id: 0,
-            },
+                id: 0,},
             1: DamageableActor {
                 defenses: Defenses {
-                    defenses: [
-                        (
-                            All,
-                            Flat(
-                                2,
-                            ),
-                        ),
-                    ],
+                    defenses: [(All,Flat(2,),),],
                     hp: 6,
                     max_hp: 10,
                     guard: 0,
@@ -593,15 +573,7 @@ OK I ended up doing this all in one sprint so apologies for the giant wall of co
         ],
         data: Attack(
             Damage {
-                amounts: [
-                    (
-                        True,
-                        4,
-                    ),
-                ],
-            },
-        ),
-    }
+                amounts: [(True,4,),],},),}
     [src/lib.rs:168:13] &self.turn_counter = 3
     [src/lib.rs:169:13] &self.world = World {
         actors: {
@@ -614,44 +586,22 @@ OK I ended up doing this all in one sprint so apologies for the giant wall of co
                     barrier: 0,
                 },
                 power: 4,
-                id: 0,
-            },
+                id: 0,},
             1: DamageableActor {
                 defenses: Defenses {
-                    defenses: [
-                        (
-                            All,
-                            Flat(
-                                2,
-                            ),
-                        ),
-                    ],
+                    defenses: [(All,Flat(2,),),],
                     hp: 2,
                     max_hp: 10,
                     guard: 0,
                     barrier: 0,
                 },
                 power: 3,
-                id: 1,
-            },
-        },
-    }
+                id: 1,},},}
     [src/lib.rs:161:17] &event = Event {
         source: 1,
-        targets: [
-            0,
-        ],
+        targets: [0,],
         data: Attack(
-            Damage {
-                amounts: [
-                    (
-                        True,
-                        3,
-                    ),
-                ],
-            },
-        ),
-    }
+            Damage {amounts: [(True,3,),],},),}
     [src/lib.rs:168:13] &self.turn_counter = 4
     [src/lib.rs:169:13] &self.world = World {
         actors: {
@@ -668,24 +618,14 @@ OK I ended up doing this all in one sprint so apologies for the giant wall of co
             },
             1: DamageableActor {
                 defenses: Defenses {
-                    defenses: [
-                        (
-                            All,
-                            Flat(
-                                2,
-                            ),
-                        ),
-                    ],
+                    defenses: [(All,Flat(2,),),],
                     hp: 2,
                     max_hp: 10,
                     guard: 0,
                     barrier: 0,
                 },
                 power: 3,
-                id: 1,
-            },
-        },
-    }
+                id: 1,},},}
     [src/lib.rs:161:17] &event = Event {
         source: 0,
         targets: [
@@ -693,15 +633,7 @@ OK I ended up doing this all in one sprint so apologies for the giant wall of co
         ],
         data: Attack(
             Damage {
-                amounts: [
-                    (
-                        True,
-                        4,
-                    ),
-                ],
-            },
-        ),
-    }
+                amounts: [(True,4,),],},),}
     [src/lib.rs:168:13] &self.turn_counter = 5
     [src/lib.rs:169:13] &self.world = World {
         actors: {
@@ -718,24 +650,14 @@ OK I ended up doing this all in one sprint so apologies for the giant wall of co
             },
             1: DamageableActor {
                 defenses: Defenses {
-                    defenses: [
-                        (
-                            All,
-                            Flat(
-                                2,
-                            ),
-                        ),
-                    ],
+                    defenses: [(All,Flat(2,),),],
                     hp: -2,
                     max_hp: 10,
                     guard: 0,
                     barrier: 0,
                 },
                 power: 3,
-                id: 1,
-            },
-        },
-    }
+                id: 1,},},}
     [src/lib.rs:271:9] evt_sys.world = World {
         actors: {
             0: DamageableActor {
@@ -751,34 +673,1797 @@ OK I ended up doing this all in one sprint so apologies for the giant wall of co
             },
             1: DamageableActor {
                 defenses: Defenses {
-                    defenses: [
-                        (
-                            All,
-                            Flat(
-                                2,
-                            ),
-                        ),
-                    ],
+                    defenses: [(All,Flat(2,),),],
                     hp: -2,
                     max_hp: 10,
                     guard: 0,
                     barrier: 0,
                 },
                 power: 3,
-                id: 1,
-            },
-        },
-    }
+                id: 1,},},}
 ```
 </CodeSnippet>
 
 It lliiiiives - and pretty much exactly as expected on the first try!  
+The knight and goblin just trade blows back and forth with the knight dealing a constant 4 damage and wiping out 
+the goblin with its 3rd attack.   
 Honestly this is what makes it hard to go back from rust. 
 Shit just works when the compiler says it does 80% of the time, and the other 18% its not too hard to find 
 out why its broken. 
 
+## EDITORS NOTES FROM THE FUTURE 
+
+Ok editor Daniel here from the future.  
+A really long and arduous process of experimentation and design commences here.  
+I'm bolding the ideas that actually end up working well and making it into the "final" version, to make the 
+mental burden of reading all this easier.  
+
+## Fixups 
+
+Ok it's all working but honestly it's pretty sloppy so I want to see about fixing that up. 
+Lets list some points for improvement : 
+
+1. Damage and Defenses could be made into a flat structs to forego iteration during calculation. 
+2. Should actor have listeners on it in the world?
+3. Actor and Damageable could be split up and composed 
+    - I dont know what that would look like but I do want some things to do something other 
+        than reduce their hp when they're hit - for example, react, or a lever you can shoot with a bow. 
+        So i want damageable to be a trait. 
+4. **An actor should have effects, which modify their state in some way when added and removed.**
+    - I think this is necessary because our 'world' needs to be serializable, and listeners arent. 
+    - Effects are a way to add a tag to a unit that specifies that a listener should be present on it. 
+    - It also lets me store more info about how the listener should act - ie 'haste(3)' could mean 3 turns of haste.
+    - I guess that means effects have arguments? An effect could reference another unit. For example, 'fear(dave,3)' 
+5. I need to think about adding and removing listeners. 
+    - Some things need to be in effect only while an actor is conscious, focusing, alive, or has an effect.
+    - 'Double haste lethargy' could be an issue too. Effects need to know how they stack. 
+    - Should listeners be on the world or on the actors? I feel like it makes more sense for them to be on actors.
+    - Listeners should maybe be tied to an effect, besides the single default one of 'listen for attacks against me'
+    - if i store them on the actor I can collect info about the 'self' simply through iteration. Thats a plus.
+
+6. Act should consume resources, like action points, and be called until theyre expended, or the actors turn ends.  
+
+OK 1 is done , not sure if its a performance improvement but its cool!
+Also I need to implement event listeners for rolls, lots of abilities work on that premise.
+
+I like this system though, it incorporates penetration in a unique way : 
+Flat defense reduces the incoming damage by a flat amount while ratio does it by... a ratio.   
+But only flat defense reduces the penetration of the incoming attack.  
+So if an attack comes in with 5 damage and 5 penetration, it will completely bypass all ratio armor regardless of the number of layers.    
+However if there is a layer with 6 flat defense on top, that will eat the 5 penetration and 1 of the damage, then 
+the ratio armor will have full effect on the remaining damage. 
+
+Penetration also doesn't care about damage type, it applies to whichever one is first.  
+Think of it like a diamond tip to the attack. 
+
+## A Problem Actually 
+
+Here's the problem : 
 <CodeSnippet filename = 'game_server.rs'>
 ```rust 
+    fn dispatch(&mut self, mut e: Event) {
+        for listener in listeners.into_iter() {
+            if (listener.matcher)(&e) {
+                match (listener.operator)(self, e) {
+                    Some(x) => e = x,
+                    None => break,
+                }
+            }
+        }
+        self.listeners = new_listeners;
+    }
+```
+</CodeSnippet>
+
+This is dispatch. Now, I think in the chain of events that transpire from an event listener running,
+it might need to dispatch more events! That's kinda the whole point. 
+
+To dispatch events, it needs a &mut to the event system, which stores it. 
+
+But iterating over the listeners requires at least a & to the event system, so we have an 
+incompatible borrowing situation.
+
+Conceptually this makes sense - we shouldn't be assuming we know all the listeners that exist 
+before we've even run one of them. 
+
+This doesn't change if I put the listeners on actors either. 
+
+I think bevy's approach to this is to issue commands that are returned from the listener, then 
+executed after iteration is done. 
+
+...
+
+Ok hear me out. 
+
+## What if we clone the whole world? 
+
+Each listener needs a &mut to an EventSystem, but who's to say it has to be the same event system 
+theyre in? 
+
+And if we use Clone On Write smart pointers, maybe we can avoid actually cloning data the listener
+doesnt change.
+
+So what if we 
+1. build a queue of listeners to run through 
+2. for each one, do the following:
+    1. clone the world (including the queue) and pass that to the listener 
+    2. ~~pop and discard the first listener from the queue to prevent infinite recursion~~
+    3. if the listener dispatches an event, we start from the beginning and recur automatically!
+    4. we return a world for the parent event system to set it's world to. 
+
+Wait how do we know when to stop running listeners? 
+We need an ordering I guess but even then if we remove or reorder actors then whatever 
+index we had into that ordering is meaningless. 
+
+So actors and listeners cant be removed or reordered during event propagation, we have to defer that. 
+
+Kinda seems like we need a little allocator or something for managing the list of actors.  
+
+The actors need an 'active' flag, or maybe the listeners do, so we can deactivate them and not 
+call them when a prior event listener would disable them without screwing up the listener queue.  
+
+I'm not sure how to make the guarantee apparent to the type system that I'm not changing the order or amount
+of the actors. Maybe using a range for iteration lets me out of that...
+
+Seems like I have to use Rc instead of box to make the trait object cloneable.
+
+OK I have to think about optimization now, its bugging me . 
+
+## COWS 
+
+I don't know if cows are the answer but basically, the world is a `BTree<id,obj>`. 
+I want to only clone the BTree if the listener modifies it.
+However, I want to allow it to modify objects without having to clone the entire tree. 
+Is this what cell's are for? 
+
+Maybe `Cow<Btree<id, Cell<obj>>>` is what I'm looking for? 
+Then the Cow doesn't realize its giving out `&mut` to the objects so it doesnt clone? 
+
+A COW is a Clone On Write smart pointer by the way.  
+
+Or I guess the actors can't be copy, so we need an RefCell. 
+
+If we give them a `&Btree<id,Rc<actor>>`, we can prevent the addition or removal of actors from the scene. 
+
+I think what I'd really like though is an iterator over all the listeners in the current event system.   
+I don't mind if new actors come into existance and enter the turn order, I just don't want any new listeners 
+to run for an event thats already propagating.  
+
+## Plan B But Recursion Hates Rc's 
+
+Ok I've taken a weekend to let this rest, lets try another approach and see how it goes. 
+
+Since the event listeners are in Rc's theyre cheaply cloneable. 
+
+Say I 
+    - create a queue of event listeners 
+    - iterate over actors in turn order, appending their listeners to the queue 
+        - listeners are stored in RCs so we dont have to worry about lifetimes here 
+    - **each listener logically references an actor but doesn't store a reference, only an ID **
+        - we need to prevent actors from being deleted still 
+    
+    Alright hold up. 
+    It seems like a big constraint is just ensuring that the actors live long enough.    
+    I can guarantee that if we only give an immutable reference to the world, but the actors themselves 
+    can be accessed with interior mutability.  
+    So then, does dispatch really need a "&mut self" ?  
+    If not then we hit a runtime error attempting to borrow a listener or actor mutably twice with recursive dispatches?  
+        - Say we have a listener that says 'if you take damage, also take 4 points of fire damage' 
+        - The default attack listener runs, mutably borrowing its actor and dispatching a damage event. 
+        - The second listener runs, attempting to also mutably borrow the actor, and we panic. 
+
+    So the first borrow *must* end by the time that we call dispatch.   
+    This isn't technically impossible but it is a giant footgun.  
+    I think it makes more sense to leverage the borrow checker to just pass a 
+    &mut World here. 
+
+## PLAN C 
+    Event listener needs to take a &mut actor.   
+    We need to store `RC<Actor>` not Actor with `Rc<Event Listener>`
+    We use mutable references for dispatch , `&mut Rc` should allow internal mutability without a runtime check I THINK 
+    Maybe event listeners need to be stored separately from actors and the actor references them? 
+
+    **Im considering keeping all the event listeners stateless, and having the state stored in the actor.**
+    
+    Each event listener just takes 'args' which it deserializes, operates on, and returns.  
+    Or takes a &mut too failing if args was wrong. 
+
+    Or I build an iter_mut over the container for the actors, that'd let me mutate the actors but not the container.
+    The event listener may need args `(&mut actor, &mut World or Event System)`. 
+
+    **The event listeners need to be borrowed immutably , even if we build a separate iterator for them, so we can recurse.**
+
+    - listeners need to mutably borrow the things in the world, but not the world itself. 
+        - seems like we need in iter_mut over the actors in the world 
+        - but if the world is mutably borrowed for iteration, i dont think we can pass a &mut event system to dispatch to recur. 
+        - What if we un-nest world, event system, and listeners? 
+        - If borrowing listeners doesn't require borrowing World or EventSystem i think this gets easier. 
+        - If we cheaply clone out the `Rc<EventListener>`'s into a collection and never borrow_mut() them, we won't panic. 
+    - **listeners do not mutably borrow themselves or other listeners** 
+        - listeners should be stored either nested under actors in an RC as they are, 
+        or in a `HashMap<effect, Rc<listener>>` or something like that. 
+    - listeners do not remove actors from the world or reorder listeners.
+        - we take a &mut world and store actors in RCs. 
+    - what if the listener queue is `Vec<Rc or &<(Listener, &mut Actor)>>` or something? 
+
+    So dispatch takes a `&mut event_dispatcher` and a `&mut world<Rc<Actor>>`.
+    It clones a list of `Rc<EventListener>` , and event listener operators take a `&mut World` ? 
+
+Maybe the real problem is having to immutably borrow something to iterate over all the listeners. 
+The way I'm writing this its like I have the assumption that these listeners actually happen sequentially, mutating 
+the world as they do. 
+Mentally that sounds like passing a &mut World to each one, and figuring out afterward what should happen next. 
+
+OK then, say we iterate over our entire list of listeners after each one runs to find out what happens next. 
+We need to store some state in the event system to know what happened last, and when to finish.
+
+**What if effect functions are stored in some sort of global static hashmap, and the actors just store a list of &str 
+keys into that.**
+
+Those function as the listeners. An actor can reference a listener that doesnt exist and no bad logic runs because it can't find 
+the logic to run in the first place. 
+
+## PLAN D 
+Ok another night of sleep on this. 
+
+**I think I can logically divide things up into events, listeners, and state.** 
+
+If those 3 things were totally separate, then a listener could just take a &mut Event and &mut State and thatd be it. 
+Its tricky because the listeners are part of the state. 
+
+**So I just need the listeners out of the state, or the world in this case, so they can't be under actor.  
+They also cant be mutable but they never were so thats not a problem.** 
+
+**Right now though each listener does store the 'self' id of the actor they belong to, so that needs to be an arg now.** 
+
+I can't take the &mut Actor self because if I borrow that as mutable I cant borrow the rest of world as mutable i think.
+
+I think also dispatch might not be able to take a &mut self if self contains world and listeners. Maybe. 
+
+Dispatch needs to both be able to be called recursively and by listeners, so if we cant pass in &mut self - because 
+we don't want to pass it &mut listeners - we need a 'dispatcher'. 
+
+Dispatch takes &listeners, and &mut world and then the borrow checker should be happy right?
+
+I think that means it can be a static method. 
+
+## PLAN E 
+
+I think that works but its not the system that I want. Logically listeners should happen sequentially and be able to 
+know if they should not run afterall. Maybe then I just build in a check to make sure the 'actor' the listener is attached 
+to both 1. exists and 2. is active. 
+
+Maybe this becomes a concept like 'effect resolution' ? 
+
+Here's my game-logic interpretation : Say we have an event listener that gives the player the ability to move out of the 
+way of an explosion. It requires the player to be able to move. If the player is petrified, that requirement isnt met. 
+
+**So maybe the actor has both 'effects' and 'status'. Effects contain tags, status is a set of the tags. We query the set 
+to see if the required tags are present.** 
+
+So petrified as an effect may look like \{ effect_name, tags, stacks, args }
+
+Where args is deserialize. Maybe I could find a way to make args a touch better with std::any. I bet that'd only be a bug 
+if modders add an effect that has a non-unique name. 
+
+OK at last something that seems workable. Lets put this into code. 
+
+...
+
+**Maybe I can split event listener into listener and operator to make things more efficient? 
+Like have a `BtreeMap<EventType, SortedVec<(Listener, actor_id)>>` where listeners are sorted by precedence 
+and `Vec<(EventOperator)>`**
+
+**An operator can be triggered by multiple listeners** but if the listeners are for different event types it gets a bit messy.
+
+...
+
+OK, its there but now I have a new concern - should events always resolve depth first? 
+Also I'm still not making a type system guarantee that world won't be mutated, or handling the mutations in any way.
+
+If dispatch is made to store a queue and resolve breadth first, it won't be recursive, so we don't need to worry about 
+modifying the world in a listener, because all listeners for the prior event will run before the next event starts resolving...
+
+Why didn't I think of this earlier? 
+
+**So event system should store a queue of events. 
+When a new event is dispatched, we append it to the queue.** 
+
+At some point, we pop an event from the queue, find all the listeners in the current world for which it is applicable,
+and run them in order. 
+
+Maybe we move the 'execute listeners' part into our 'run' function for the event system? 
+It no longer feels like it fits in the 'dispatch' function. 
+
+So run will have an actor act until it ends its turn. 
+Each action dispatches events, adding them to a queue. 
+We then resolve the events 1 by 1 by finding all the listeners, and running them. 
+
+## The Code 
+
+Lets go piece by piece. I'll explain each chunk after and omit extraneous bits.
+
+<CodeSnippet filename = 'game_server.rs'>
+```rust 
+    #[derive(Debug, Clone)]
+    pub struct DamageableActor {
+        defenses: Defenses,
+        power:    i64,
+        id:       usize,
+        status:   HashSet<&'static str>,
+        effects:  Vec<Effect>,
+    }
+
+    struct ActionPoints(u8);
+
+    impl DamageableActor {
+        //im not sure how to implement actions yet so we're just doing events
+        fn act(&self, world: &World, dispatcher: &mut Dispatcher) {
+            //find the nearest guy thats not me and hit them
+            let other_id = world.actors.iter().find(|u| u.0 != &self.id);
+            if let Some(target_id) = other_id {
+                let dmg = Damage { amounts: vec![DamageAmount { bonus:       self.power as i32,
+                                                                dice:        vec![8],
+                                                                penetration: 0,
+                                                                dtype:       DamageType::Slash, }], };
+                dispatcher.dispatch(Event { source:  self.id,
+                                            targets: vec![*target_id.0],
+                                            data:    EventData::Attack(dmg), });
+            }
+        }
+
+        fn new(power: i64, defenses: Defenses) -> Self {
+            return Self { id: 0,
+                        power,
+                        defenses,
+                        status: HashSet::new(),
+                        effects: vec![] };
+        }
+    }
+
+    impl Default for DamageableActor {
+        fn default() -> Self {
+            DamageableActor { defenses: Defenses::default(),
+                            power:    3,
+                            id:       0,
+                            status:   HashSet::new(),
+                            effects:  vec![Effect::with_name("Recieve Attacks")], }
+        }
+    }
+
+    #[derive(Debug, Clone)]
+    struct Effect {
+        name:         &'static str,
+        ///statuses required to have effect
+        requirements: Vec<(&'static str)>,
+        ///statuses inflicted by effect
+        statuses:     Vec<&'static str>,
+    }
+
+    impl Effect {
+        fn with_name(name: &'static str) -> Self {
+            return Self { name,
+                        requirements: vec![],
+                        statuses: vec![] };
+        }
+    }
 
 ```
 </CodeSnippet>
+
+Our actors are defined by their ability to act, returning a series of events they wish to emit.  
+`act()` only takes a &World though, all mutations to the world must be done in listeners or directly by the game loop.
+
+Effects are how I'm going to achieve subscription / unsubscription - when an actor obtains an effect, its equivalent
+to adding an event listener for that actor with the matching name. 
+
+I think this is pretty suboptimal and hard to debug, but its very flexible.  
+I think some effects should perhaps block others, but I might be able to accomplish that with event propagation. 
+
+<CodeSnippet filename = 'game_server.rs'>
+```rust 
+    #[derive(Debug, Clone)]
+
+    pub struct World {
+        actors: BTreeMap<usize, DamageableActor>,
+        next:   usize,
+    }
+
+    impl World {
+        pub fn new() -> World {
+            return World { actors: BTreeMap::new(),
+                        next:   0, };
+        }
+
+        pub fn set_actor(&mut self, mut actor: DamageableActor) -> usize {
+            actor.id = self.next;
+            self.actors.insert(self.next, actor);
+            let id = self.next;
+            self.next += 1;
+            return id;
+        }
+        pub fn get_actor(&mut self, id: usize) -> Option<&DamageableActor> {
+            if id >= self.next {
+                return None;
+            }
+            self.actors.get(&id)
+        }
+        // boilerplate etc.
+    }
+
+    impl IntoIterator for World {
+        type Item = (usize, DamageableActor);
+        type IntoIter = <BTreeMap<usize, DamageableActor> as IntoIterator>::IntoIter;
+        fn into_iter(self) -> Self::IntoIter {
+            return self.actors.into_iter();
+        }
+    }
+```
+</CodeSnippet>
+
+World is pretty much as simple as could be - it stores a BTreeMap of actors with sequential id's as keys. 
+It's probably a better idea to use uuids in hindsight...
+
+<CodeSnippet filename = 'game_server.rs'>
+```rust 
+    #[derive(Debug, Clone)]
+    pub enum EventData {
+        Attack(Damage),
+        Damaged(Damage),
+        Felled,
+    }
+
+    #[derive(Debug, Clone)]
+    pub struct Event {
+        source:  usize,
+        targets: Vec<usize>,
+        data:    EventData,
+    }
+
+    #[derive(Clone)]
+    pub struct EventListener {
+        pub name:     &'static str,
+        pub order:    i64,
+        pub matcher:  Rc<dyn Fn(usize, &World, &Event) -> bool>,
+        pub operator: Rc<dyn Fn(usize, &mut World, Event) -> Option<Event>>,
+    }
+
+    impl Debug for EventListener {
+        fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+            f.debug_struct("Event Listener")
+            .field("name", &self.name)
+            .field("order", &self.order);
+            return Ok(());
+        }
+    }
+```
+</CodeSnippet>
+
+I would rather use an enum than a deserializable type for performance reasons - each listener would have to 
+independently deserialize the event otherwise.  
+However, in the future I think it'll be inevitable with mods to have a 'dynamic' variant that stores arbitrary data.
+
+Event listeners as before have an order - influencing the order they will run - the matcher, and the operator. 
+The name is mostly for debug purposes.  
+
+These are stored in Rcs because trait objects aren't `Clone` even if the closure they point to is.  
+
+
+<CodeSnippet filename = 'game_server.rs'>
+```rust 
+    #[derive(Clone)]
+    pub struct EventSystem {
+        turn_order:   VecDeque<usize>,
+        ///maps effect name to listener logic
+        listeners:    HashMap<&'static str, EventListener>,
+        dispatcher:   Dispatcher,
+        world:        World,
+        turn_counter: u64, //plans : Vec
+    }
+
+    #[derive(Debug, Clone, Default)]
+    pub struct Dispatcher {
+        event_queue: VecDeque<Event>,
+    }
+
+    impl Dispatcher {
+        pub fn next(&mut self) -> Option<Event> {
+            return self.event_queue.pop_front();
+        }
+
+        pub fn dispatch(&mut self, event: Event) {
+            self.event_queue.push_back(event);
+        }
+    }
+
+    impl Default for EventSystem {
+        fn default() -> Self {
+            let listeners = HashMap::new();
+            let world = World::new();
+            let turn_counter = 0;
+            let turn_order = VecDeque::new();
+            let dispatcher = Dispatcher::default();
+
+            let mut sys = EventSystem { listeners,
+                                        world,
+                                        turn_counter,
+                                        dispatcher,
+                                        turn_order };
+            sys.register_listener("Recieve Attacks",
+                            EventListener { name:     "Recieve Attacks",
+                                            order:    0,
+                                            matcher:  attack_matcher(),
+                                            operator: attack_operator(), });
+            return sys;
+        }
+    }
+```
+</CodeSnippet>
+
+Getting to the meat now, we have our data definition for the event system. 
+
+We're now storing listeners and dispatcher as their own fields so we can pass references independently as 
+`&listener` and `&mut dispatcher` alongside `&world` without pissing off the borrow checker. 
+
+Listeners is pretty much static , all of the known event listeners should be added at the start. 
+Because of that some of them will have to store state information on the actor, which I think should be a part 
+of its `Effect`. For example, 'Burning' could do fire damage per turn but how much? It can't be encoded in the listener if we 
+want it to be different between actors and instances of burning.   
+
+I'm thinking I'll support some common stuff like 'stacks' or 'duration' or 'marks', but beyond that 
+I'll have to use std::any or deserialization for dynamic data , like an effect that references a 
+specific actor or set of actors.
+
+<CodeSnippet filename = 'game_server.rs'>
+```rust 
+    ///match events that are attacks targeting this unit
+    fn attack_matcher() -> Rc<dyn Fn(usize, &World, &Event) -> bool> {
+        return Rc::new(move |id: usize, w: &World, e: &Event| match e.data {
+            EventData::Attack(_) => e.targets.iter().find(|u| **u == id).is_some(),
+            _ => false,
+        });
+    }
+
+    //event listener that damages this unit when an enemy attacks it
+    fn attack_operator() -> Rc<dyn Fn(usize, &mut World, Event) -> Option<Event>> {
+        return Rc::new(move |id: usize, w: &mut World, e: Event| {
+            if let Some(this) = w.actors.get_mut(&id)
+            && let EventData::Attack(dmg) = &e.data
+            {
+                this.defenses.damage(&dmg.roll());
+            }
+            return None;
+        });
+    }
+```
+</CodeSnippet>
+
+These functions return a closure that 
+1. Chooses when the operator should be run based on the incoming event - in this case, when an attack event targets the 
+actor this listener recognizes as 'self'. 
+2. Damages the 'self' in accordance with the damage recieved.
+
+I think the comments actually do a good job of explaining this next bit!
+
+<CodeSnippet filename = 'game_server.rs'>
+```rust 
+    //an event system could be a thing thats constructed on combat start
+    //from a subset of units in the world.
+    //uses a 'plan -> execute' style where actor.act is only given a &world, and is expected to return a list of events.
+    //an interactive system could be made where the same actor is allowed to act repeatedly until their turn ends.
+    impl EventSystem {
+        fn new() -> Self {
+            let turn_order = VecDeque::new();
+            let listeners = HashMap::new();
+            let dispatcher = Dispatcher { event_queue: VecDeque::new(), };
+            let world = World::new();
+            let turn_counter = 0;
+            return EventSystem { turn_order,
+                                listeners,
+                                dispatcher,
+                                world,
+                                turn_counter };
+        }
+
+        fn run(&mut self) {
+            self.turn_counter = 0;
+            //everything in the world will now engage in a battle to the death in arbitrary order
+            self.turn_order = self.world.actors.keys().map(|k| *k).collect::<VecDeque<usize>>();
+            //lets just run till theres only one living unit
+            while self.turn_order.len() > 1 {
+                let turn = self.turn_order.pop_front().unwrap();
+                let mut actor = self.world
+                                    .actors
+                                    .get(&turn)
+                                    .expect("Actor with turn does not exist");
+                if (0 >= actor.defenses.hp) {
+                    continue;
+                }
+
+                //right now we act once, in the future we'll continue acting until all AP are expended or the turn is
+                //ended.
+                actor.act(&self.world, &mut self.dispatcher);
+
+                while let Some(event) = self.dispatcher.next() {
+                    dbg!(&event);
+                    self.run_listeners(event);
+                }
+
+                //remove dead actors from turn order
+                //need to relookup to shadow previous actor to make borrow checker happy because 
+                //our actor could have been deleted during self.run_listeners.
+                let mut actor = self.world
+                                    .actors
+                                    .get(&turn)
+                                    .expect("Actor with turn does not exist");
+                if (actor.defenses.hp > 0) {
+                    self.turn_order.push_back(turn);
+                }
+                self.turn_counter += 1;
+                dbg!(&self.turn_counter);
+                dbg!(&self.world);
+            }
+        }
+
+        //technically over borrows but i think its fine for now
+        fn run_listeners(&mut self, mut event: Event) {
+            let mut listener_queue = Vec::new();
+
+            //for each effect on each actor, check the matcher
+            //if it returns true for the current event, append the listener 
+            //to our queue. Right now things run in ID order but i think another order would be best.
+            for (id, actor) in self.world.iter() {
+                for effect in &actor.effects {
+                    if let Some(l) = self.listeners.get(effect.name) {
+                        if (l.matcher)(*id, &self.world, &event) {
+                            listener_queue.push((l, *id))
+                        }
+                    }
+                    else {
+                        println!("Effect not found : {}", effect.name);
+                    }
+                }
+            }
+
+            //sort the queue by 'order' so lower order listeners run first.
+            listener_queue.sort_by(|&(l1, _), &(l2, _)| l2.order.cmp(&l1.order));
+
+            //run the listeners, transforming event as we go.
+            //we quit if the event was consumed and not returned. 
+            while let Some(next) = listener_queue.pop() {
+                let event_opt = (next.0.operator)(next.1, &mut self.world, event);
+                if let Some(e) = event_opt {
+                    event = e;
+                } else {
+                    break;
+                }
+            }
+        }
+
+        fn add_unit(&mut self, mut actor: DamageableActor) {
+            self.world.set_actor(actor);
+        }
+
+        fn register_listener(&mut self, effect_name: &'static str, listener: EventListener) {
+            self.listeners.insert(effect_name, listener);
+            //this could definitely be improved, probably by using a sorted vec or a tree
+            //self.listeners.sort_by(|a, b| a.order.cmp(&b.order));
+        }
+    }
+```
+</CodeSnippet>
+
+
+<CodeSnippet filename = 'game_server.rs'>
+```rust 
+   #[test]
+    fn events_2() {
+        let mut evt_sys = EventSystem::default();
+        evt_sys.add_unit(DamageableActor::default());
+        let mut armor = Defenses::default();
+        armor.defenses.push((DamageType::Any, DefenseType::Flat(2)));
+        let mut armored = DamageableActor::default();
+        armored.defenses = armor;
+        evt_sys.add_unit(armored);
+        evt_sys.run();
+    }
+```
+</CodeSnippet>
+
+And with that, it runs as expected!
+
+To be honest though I'm still pretty unhappy with this set up. 
+I'm glad that it works but ...
+- It's finnicky to debug 
+- It's not really all that 3rd party friendly.
+- I'm not happy with the way Effects and Matchers work. 
+- I think passing a `&World\<Rc\<Actor>>` for interior mutability without spawning or deleting actors 
+is best. It's tricky though because then any &World allows the modification of actors.
+- Then again I like that the current system forces you to use events to modify the world instead of doing it directly in 
+act, so perhaps I'll keep it this way.
+- Actor, World, and Event should be generic. 
+
+I think I'll make this whole thing generic and then maybe see about releasing the event system as a crate.  
+I can use encapsulation to make World, Event, and Actor generic. 
+
+Let me start by splitting this up into a few modules - actor, damage, event_system, and listeners should do it.
+
+- Also to generalize the event system, run will have to run a single actors turn, not loop forever.    
+- Actor will no longer store it's id, since it wouldn't make sense for it to not match the key.  
+- I'm renaming Effects to Behaviors. 
+...
+
+Ok I ran into a tricky problem with Behavior Data - the custom data that Behaviors can store on an actor that 
+has the behavior. Here's what I have right now. 
+
+<CodeSnippet filename = 'game_server.rs'>
+```rust 
+    pub struct Actor<T> {
+        pub inner: T,
+        behaviors: Vec<BehaviorKey>,
+    }
+
+    #[derive(Debug, Clone)]
+    pub struct BehaviorKey {
+        pub name:         &'static str,
+        ///statuses inflicted by effect
+        pub statuses:     Vec<&'static str>,
+        pub count:        usize, 
+        pub data:         Box<dyn Any>
+    }
+```
+</CodeSnippet>
+
+I want to make it so that Behavior has a get_key method that generates a default behavior key to store on an actor.  
+That way we can't fuck up adding a behavior to that actor by say, misspelling the name or key.  
+My problem : I cant generate default data to put in Behavior Key, because Default extends Clone which is not 
+object safe. 
+
+I thought about maybe having a 'template' default value but eventually decided to add an initializer function to 
+behavior. 
+
+<CodeSnippet filename = 'game_server.rs'>
+```rust 
+#[derive(Clone)]
+    pub struct Behavior<W,A,E> {
+        pub name:     &'static str,
+        pub order:    i64,
+        pub statuses: Vec<&'static str>,
+        pub matcher:  Rc<dyn Fn(usize, &World<W,A>, &Event<E>, &Box<dyn Any>) -> bool>,
+        pub operator: Rc<dyn Fn(usize, &mut World<W,A>, Event<E>, &mut Box<dyn Any>) -> Option<Event<E>>>,
+        pub initializer: Rc<dyn Fn() -> Box<dyn Any>>
+    }
+```
+</CodeSnippet>
+
+When I register behaviors to the event system I'm going to have to make it a panic for there to be duplicate 
+names. Debugging that sounds like it'd be way too tedious.
+
+While I'm here though I want to detatch `matcher` from `operator` .   
+
+In order to make this whole system scaleable - so we don't have to run every single matcher for every single event - 
+I want to have the event system store something like `BTree<EventType, Listener>` where listener is a function 
+that returns the actor id and the operator key. Or maybe `BTree<EventType, (matcher, actor_id, operator_key)>`.
+
+Then if we want to listen for multiple types of events - unusual I imagine but possible - we need to register 
+multiple matchers. 
+
+While I don't mind having every operator pre-loaded, I would prefer to keep listeners to only include things 
+that are actually in the world. They should be registered when the behavior is added and deregistered when the 
+behavior is removed.
+
+So it doesn't really make sense to do this until we actually implement an abstraction over adding and removing 
+behaviors.
+
+I'd like to think of actors as self contained data but we can't get away from referencing the world and event 
+system here. Deserializing a serialized actor would have to be done by an event system that has full knowledge
+of registered Behaviors. 
+
+I don't want to let an operator add behaviors to other actors trivially. 
+I don't think I can get around implementing something like bevy's Commands, to serve as an interface for 
+adding and removing actors and behaviors on actors.
+
+I could maybe make world's get_actor function return a reference to the inner data defined by the implementor instead
+of the whole actor. 
+
+I think for now I'll keep giving out a `&mut World`, but I still need a good interface for adding behaviors. 
+
+Maybe I can put the matchers on world? That way a `&mut World` is sufficient, so I can put a `add_behavior` method 
+on Actor and use it in operators. This should fail loudly and early if `EventSystem.operators[key]` isn't present.
+
+...
+
+I think Event should actually not be generic - we can't even use E for matches - instead it should use any. 
+Then we have a `BTree<type_id, Vec<(Matcher,actor_id,operator_key)>>`. 
+
+Before anything else, the event system has to have all the behaviors registered into it into a map called Behaviors. 
+We only give out a reference to this. 
+It'll store the template for the listeners that have to be added to the world for an actor when a behavior is added to them.
+It'll also store the operators. 
+
+Then the world has to store a map like BTreeMap\<TypeId, Vec\<(actor_id, Matcher, BehaviorKey)>>
+
+Here's most of the changes to our data model.
+All the important ones in event_sys.rs anyway.
+
+<CodeSnippet filename = 'game_server.rs'>
+```rust 
+    #[derive(Debug, Clone)]
+    pub struct Event {
+        pub source:  usize,
+        pub targets: Vec<usize>,
+        pub data:    Box<dyn Any>,
+    }
+
+    pub type Matcher<W,A> = Rc<dyn Fn(usize, &World<W,A>, &Event, &Box<dyn Any>)->bool>;
+    pub type Operator<W,A> = Rc<dyn Fn(usize, &mut World<W,A>, Event, &mut Box<dyn Any>) -> Option<Event>>;
+    pub type Initializer = Rc<dyn Fn() -> Box<dyn Any>>;
+
+    #[derive(Clone)]
+    pub struct Behavior<W,A> {
+        pub order:    i64,
+        pub statuses: Vec<&'static str>,
+        pub matchers: BTreeMap<std::any::TypeId,Matcher<W,A>>,
+        pub operator: Operator<W,A>,
+        pub initializer: Initializer
+    }
+
+    impl<W,A> Behavior<W,A>{
+        pub fn get_data(&self)-> BehaviorData {
+            BehaviorData { name: self.name, statuses: self.statuses, count: 1, data: self.initializer() }
+        }
+    }
+
+    #[derive(Debug, Clone)]
+    pub struct BehaviorData {
+        pub name:         &'static str,
+        pub statuses:     Vec<&'static str>,
+        pub count:        usize, 
+        pub data:         Box<dyn Any>
+    }
+
+    pub struct Listener {
+        matcher : Matcher,
+        actor_id : usize,
+        behavior_key : &'static str
+    }
+
+    #[derive(Debug, Clone)]
+    pub struct World<W,A> {
+        actors: BTreeMap<usize, Actor<A>>,
+        next:   usize,
+        listeners : BTreeMap<TypeId, Vec<Listener>>,
+        pub inner:  W,
+    }
+
+    #[derive(Clone)]
+    pub struct EventSystem<W,A> {
+        turn_order:   VecDeque<usize>,
+        ///maps effect name to listener logic
+        behaviors:    HashMap<&'static str, Behavior<W,A>>,
+        dispatcher:   Dispatcher,
+        world:        World<W,A>,
+        turn_counter: u64, //plans : Vec
+    }
+
+```
+</CodeSnippet>
+
+Now actor.act has to take in a `&Behaviors`, 
+World needs to implement `add_behavior(actor_id, behavior_name)`, and `remove_behavior(actor_id, behavior_name)`,
+World needs to implement `remove_actor` and cleanup behaviors when doing so, 
+run_listeners needs to use the new method for finding listeners and running the operators, and probably have its 
+name be updated, 
+then I think I can go back to goblins and knights and maybe make an example.
+O right apparently damage needs some attention regarding the abstraction around defenses. 
+I want to make some things in the scene that are basically inert objects or triggers - theyll behave differently 
+when hit. I may put that off until after the goblin kills the knight.
+
+...
+
+## Revisiting Actors
+
+Actually I'm thinking that instead of taking a `&mut Dispatcher` in `act()` we should just return a single event.
+Events won't happen until after `act()` completes so is there any use in doing things after a call to dispatch? 
+
+For example, say we want to attack 3 times, but after the first one we trigger something that kills us.  
+We shouldn't be able to attack twice more, we're dead.  
+Nevertheless, if we allow arbitrary calls to dispatch within act, we can dispatch as many events as we want before 
+any of them get a chance to resolve. 
+
+I think I'll change it. 
+
+Actually, now that we're doing things this way, actors can all act in parallel if we want.
+I can probably make a parallel event system as well as a serial one. 
+I imagine how 'act' is expected to work could define the type of turn system - return a single event, 
+return multiple , return in a timeframe (for realtime), etc. 
+
+I do need to think about actor lifecycles a bit though.
+
+Namely, are these data or code? 
+I think different types of actors should be able to be created without recompiling of course.  
+But we should be able to hard-code variants for testing purposes, maybe using a builder pattern.
+
+If we have AI actors I'd also like those to be able to do different 'act' functions.
+At a minimum we'll have 2 types of actors in a event system, those driven by players and those driven by 
+an AI. 
+Then perhaps we could have different kinds of AI? . 
+So then I suppose for now, while we only have AIs (not llms) , our Actor\<Data> will just have different 
+'default' data. 
+
+Our init function will take in that data and add behaviors as appropriate. It may need to emit an event, such as 
+'move' to set its position. 
+
+So I could define `Actor\<PlayerData>` and then `impl Act for Actor\<PlayerData>`.  
+I think I presume the place calling 'world.set_actor' is providing the PlayerData.   
+So should PlayerData include a list of behaviors? Should Actor?  
+Maybe init requires both PlayerData and a list of behaviors to add by name?  
+We can't deserialize or even really test behavior data then. 
+
+I don't think its crazy to think that PlayerData might provide a list of the desired Behaviors 
+that their actors may use. 
+
+Maybe PlayerData could be expected to have a function all_behaviors or something that returns a list of them. 
+
+If we want to support mods the playerdata we implement would what, have to look for a specific function in a .dll 
+to return a list of behaviors to add? 
+
+IDK how .dll's will work with this, I'm just going to assume its possible or there's a workaround for now.
+
+So our flow looks like this right now 
+1. `event_system\<W,A=PlayerData>::new()` calls `A::all_behaviors()` and registers them
+2. We do `PlayerData::goblin() -> (PlayerData, BTreeMap<behavior_names, Option<BehaviorData>)` and call `event_system.add_actor(data, behaviors)`
+    - if our option is none we give that to initialize, if its Some we place it in as is. 
+3. That calls `world.add_actor(&mut self, data, names)`
+4. world chooses an id, creates an actor with actor.inner=data, puts it into the world, then for each name it attempts 
+to add a behavior. 
+5. finally we run actor.init() and put the event it returns in the dispatch queue. 
+
+Ok that sounds like itd work, lets see. 
+
+Ugggh ok apparently my language server wasnt working this whole time so there's a ton of bugs I have to fix now. 
+
+Also I'm realizing that the 'initializer' for behavior data isn't enough.  
+If behaviors can be stacked they may need to do something when a stack is added or lost also, not just when it is first obtained.  
+
+For now I'm going to settle on 'removing the status removes the data from actor.behavior_data'.  
+
+If we want something that depreciates stacks over time it'll have to be in the operator.
+
+...
+
+OK it all compiles! I need to make sure world.listeners is storing them in precedence order though , maybe I'll 
+use sorted_vec. 
+
+<CodeSnippet filename = 'game_server.rs'>
+```rust 
+    the trait bound `Listener<W, A>: Ord` is not satisfied
+    unsatisfied trait bound
+```
+</CodeSnippet>
+
+Ok just have to implement ord for listener so it uses precedence for comparison.
+
+Wait I never put precedence in the listener woops lets fix that. 
+
+<CodeSnippet filename = 'game_server.rs'>
+```rust 
+    pub struct Listener<W, A>
+        where A: ABounds<W>,
+            W: WBounds,
+    {
+        matcher:      Matcher<W, A>,
+        precedence:   i64,
+        actor_id:     usize,
+        behavior_key: &'static str,
+    }
+
+    impl<W,A> Clone for Listener<W,A> 
+        where A: ABounds<W>,
+            W: WBounds,{
+        fn clone(&self) -> Self {
+            Listener { matcher: self.matcher.clone(), precedence : self.precedence, actor_id: self.actor_id, behavior_key: self.behavior_key }
+        }
+    }
+
+    impl<W,A> PartialEq for Listener<W,A>     
+    where A: ABounds<W>,
+        W: WBounds, {
+        fn eq(&self, other: &Self) -> bool {
+            self.precedence == other.precedence && self.actor_id == other.actor_id && self.behavior_key == other.behavior_key
+        }
+    }
+
+    impl<W,A> PartialOrd for Listener<W,A>     
+    where A: ABounds<W>,
+        W: WBounds, {
+        fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
+            Some(self.precedence.cmp(&other.precedence))
+        }
+    }
+
+    impl<W,A> Ord for Listener<W,A>     
+    where A: ABounds<W>,
+        W: WBounds, {
+        fn cmp(&self, other: &Self) -> std::cmp::Ordering {
+            return self.precedence.cmp(&other.precedence);
+        }
+    }
+
+    impl<W,A> Eq for Listener<W,A>     
+    where A: ABounds<W>,
+        W: WBounds, {}
+
+    ...
+
+    pub struct World<W, A>
+        where A: ABounds<W>,
+            W: WBounds
+    {
+        actors:    BTreeMap<usize, Actor<W, A>>,
+        next:      usize,
+        //vec could be made into a second tree or sorted vec for better perf in high complexity worlds
+        listeners: BTreeMap<TypeId, SortedVec<Listener<W, A>>>,
+        pub inner: W,
+    }
+```
+</CodeSnippet>
+
+That definition really blew up just so listeners could be ordered. Sorted vec requires listener to be `Ord` which 
+requires everything else there transitively.
+
+## Abstracting Event System
+
+I want to have multiple different event systems.  
+One for say, doing things in serial order like dnd, one for parallel turns, and maybe one for realtime - or more like, 
+first come first serve perhaps. 
+
+That changes how `new()` and `next()` will work, and potentially how `run_listeners()` will work. 
+
+I'm thinking I split the current system into EventSystemCore and SequentialEventSystem as well as the EventSystem trait. 
+EventSystemCore should store and provide an interface for behaviors, dispatcher, and world. 
+
+Sequential Event system can store and use turn_order and turn_counter to implement `next()` while using the default 
+`run_listeners()` from EventSystemCore. 
+
+
+## A Bunch Of Coding Later!
+
+<CodeSnippet filename = 'event_sys.rs'>
+```rust 
+    use crate::actor;
+    use crate::damage::{Damage, Defenses};
+    use anyhow::*;
+    use rand::prelude::*;
+    use rand::random_range;
+    use sorted_vec::SortedVec;
+    use std::any::{Any, TypeId};
+    use std::collections::BTreeMap;
+    use std::collections::HashMap;
+    use std::collections::HashSet;
+    use std::collections::VecDeque;
+    use std::collections::btree_map::IterMut;
+    use std::fmt::Debug;
+    use std::marker::PhantomData;
+    use std::rc::Rc;
+
+    /// A trait extending all the bounds World data must satisfy.
+    pub trait WBounds: Default + Debug {}
+
+    impl<W, T> ABounds<W> for T
+        where T: ActorBehaviors<W,T> + Act<W,T> + Debug,
+            W: WBounds
+    {
+    }
+
+    impl<T> WBounds for T where T: Default + Debug{}
+
+    /// A trait extending all the bounds Actor data must satisfy.
+    /// Depends on W because how an Actor<A> should act depends on how A implements act which may depend on 
+    /// custom world or actor data.
+    pub trait ABounds<W>: ActorBehaviors<W,Self> + Act<W,Self> + Sized + Debug
+        where W: WBounds
+    {
+    }
+
+    /// Trait for setting up the behaviors registry in an event system from the actor type.
+    /// Actors are written with assumptions about what behaviors exist and what properties exist in the world and on themselves.
+    pub trait ActorBehaviors<W,A>
+        where W: WBounds,
+            A: ABounds<W>
+    {
+        fn all_behaviors() -> HashMap<&'static str, Behavior<W, A>>;
+    }
+
+    /// Defining trait for actors.
+    /// The actor must be able to 'act' given an immutable ref to the world and the behaviors available.
+    /// Init is called immediately as the actor is added to the world and may return events which will be dispatched.
+    pub trait Act<W,A>
+        where W: WBounds, A : ABounds<W>
+    {
+        fn init(&self, self_id: usize, world: &World<W, A>, behaviors: &BehaviorMap<W, A>) -> Option<Event>;
+        fn act(&self, self_id: usize, world: &World<W, A>, behaviors: &BehaviorMap<W, A>) -> Option<Event>;
+    }
+
+    /// The agents in an event system with customizable data A.
+    pub struct Actor<W, A>
+        where A: ABounds<W>,
+            W: WBounds
+    {
+        pub inner:     A,
+        /// Data attached to this actor, managed by behaviors registered with a name = the key.
+        behavior_data: BTreeMap<&'static str, BehaviorData>,
+        phantom:       PhantomData<W>,
+    }
+
+    impl<W,A> Act<W,A> for Actor<W,A>
+    where W : WBounds, A : ABounds<W> 
+    {
+        fn act(&self, self_id: usize, world: &World<W, A>, behaviors: &BehaviorMap<W, A>) -> Option<Event> {
+            return self.inner.act(self_id, world, behaviors);
+        }
+        fn init(&self, self_id: usize, world: &World<W, A>, behaviors: &BehaviorMap<W, A>) -> Option<Event> {
+            return self.inner.init(self_id, world, behaviors);
+        }
+    }
+
+    impl<W,A> ActorBehaviors<W,A> for Actor<W,A> where W : WBounds, A : ABounds<W> {
+        fn all_behaviors() -> BehaviorMap<W,A> {
+            A::all_behaviors()
+        }
+    }
+
+    /// At least one listener exists for each behavior on each actor in the world.
+    /// They listen for an event of a certain type. The event any::type_id is guaranteed to match.
+    /// If matcher returns true, the corresponding operator for the behavior and actor will be called during event propagation.
+    #[derive(Debug)]
+    pub struct Listener<W, A>
+        where A: ABounds<W>,
+            W: WBounds,
+    {
+        matcher:      Matcher<W, A>,
+        precedence:   i64,
+        actor_id:     usize,
+        behavior_key: &'static str,
+    }
+
+    impl<W,A> Clone for Listener<W,A> 
+        where A: ABounds<W>,
+            W: WBounds,{
+        fn clone(&self) -> Self {
+            Listener { matcher: self.matcher.clone(), precedence : self.precedence, actor_id: self.actor_id, behavior_key: self.behavior_key }
+        }
+    }
+
+    impl<W,A> PartialEq for Listener<W,A>     
+    where A: ABounds<W>,
+        W: WBounds, {
+        fn eq(&self, other: &Self) -> bool {
+            self.precedence == other.precedence && self.actor_id == other.actor_id && self.behavior_key == other.behavior_key
+        }
+    }
+
+    impl<W,A> PartialOrd for Listener<W,A>     
+    where A: ABounds<W>,
+        W: WBounds, {
+        fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
+            Some(self.precedence.cmp(&other.precedence))
+        }
+    }
+
+    impl<W,A> Ord for Listener<W,A>     
+    where A: ABounds<W>,
+        W: WBounds, {
+        fn cmp(&self, other: &Self) -> std::cmp::Ordering {
+            return self.precedence.cmp(&other.precedence);
+        }
+    }
+
+    impl<W,A> Eq for Listener<W,A>     
+    where A: ABounds<W>,
+        W: WBounds, {}
+
+    /// The world actors reside in.
+    /// Can be customized with arbitrary data W which can be used in Event System and Behavior logic.
+    /// Actors are assigned sequential id's as they are added...for now.
+    pub struct World<W, A>
+        where A: ABounds<W>,
+            W: WBounds
+    {
+        actors:    BTreeMap<usize, Actor<W, A>>,
+        next:      usize,
+        //vec could be made into a second tree or sorted vec for better perf in high complexity worlds
+        listeners: BTreeMap<TypeId, SortedVec<Listener<W, A>>>,
+        pub inner: W,
+    }
+
+    impl<W, A> Default for World<W, A>
+        where A: ABounds<W>,
+            W: WBounds
+    {
+        fn default() -> Self {
+            return World { actors:    BTreeMap::new(),
+                        next:      0,
+                        listeners: BTreeMap::new(),
+                        inner:     W::default(), };
+        }
+    }
+
+    // fn a <W,A> (a : Actor<W,A>) where W : WBounds, A : ABounds<W>
+    // {
+    //     let o = a.behavior_data.insert(
+    // }
+
+    impl<W, A> World<W, A>
+        where A: ABounds<W>,
+            W: WBounds
+    {
+        pub fn new(w: W) -> World<W, A> {
+            return World { actors:    BTreeMap::new(),
+                        next:      0,
+                        listeners: BTreeMap::new(),
+                        inner:     w, };
+        }
+        pub fn add_actor(&mut self,
+                        actor_data: A,
+                        behaviors: Vec<(&'static str, Option<BehaviorData>)>,
+                        behavior_map: &BehaviorMap<W,A>)
+                        -> Result<usize> {
+            let mut behavior_data = BTreeMap::<&'static str, BehaviorData>::new();
+            let id = self.next;
+            for (name, opt_data) in behaviors.into_iter() {
+                let x = match opt_data {
+                    Some(data) => data, 
+                    None => behavior_map.get(name)
+                                        .ok_or_else(|| anyhow!("Behavior with name {} not found in registry.", name))?
+                                        .init_data()
+                };
+                behavior_data.insert(name,x);
+                let behavior = behavior_map.get(name).ok_or_else(|| anyhow!("Could not find behavior named {} in system", name))?;
+                for (type_id, matcher) in &behavior.matchers {
+                if let Some(listeners) = self.listeners.get_mut(&type_id) {
+                    listeners.push(Listener { matcher:      matcher.clone(),
+                                            precedence:   behavior.order,
+                                            actor_id:     id,
+                                            behavior_key: name, });
+                } else {
+                    self.listeners.insert(*type_id,
+                                        SortedVec::from_unsorted(vec![Listener { actor_id:     id,
+                                                        precedence:   behavior.order,
+                                                        matcher:      matcher.clone(),
+                                                        behavior_key: name, }]));
+                }
+            }
+            }
+            self.actors.insert(self.next, Actor{ inner : actor_data, behavior_data, phantom: PhantomData::<W>});
+            self.next += 1; 
+            return Ok(id);
+        }
+
+        pub fn get_actor(&self, id: usize) -> Option<&Actor<W, A>> {
+            if id >= self.next {
+                return None;
+            }
+            self.actors.get(&id)
+        }
+        pub fn get_actor_mut(&mut self, id: usize) -> Option<&mut Actor<W, A>> {
+            if id >= self.next {
+                return None;
+            }
+            return self.actors.get_mut(&id);
+        }
+        pub fn take_actor(&mut self, id: usize) -> Option<Actor<W, A>> {
+            if id >= self.next {
+                return None;
+            }
+            return self.actors.remove(&id);
+        }
+
+        /// set behaviors on an actor already in the world.
+        pub fn set_behavior(&mut self, id: usize, name: &'static str, map: &BehaviorMap<W, A>) -> Result<()> {
+            let behavior = map.get(name)
+                            .ok_or_else(|| anyhow!("Could not find key {} in behavior map", name))?;
+            let actor = self.actors.get_mut(&id).ok_or_else(|| {
+                                                    anyhow!("Could not find actor with id {} to add behavior {}",
+                                                            id,
+                                                            name)
+                                                })?;
+
+            for (type_id, matcher) in &behavior.matchers {
+                if let Some(listeners) = self.listeners.get_mut(&type_id) {
+                    listeners.push(Listener { matcher:      matcher.clone(),
+                                            precedence:   behavior.order,
+                                            actor_id:     id,
+                                            behavior_key: name, });
+                } else {
+                    self.listeners.insert(*type_id,
+                                        SortedVec::from_unsorted(vec![Listener { actor_id:     id,
+                                                        precedence:   behavior.order,
+                                                        matcher:      matcher.clone(),
+                                                        behavior_key: name, }]));
+                }
+            }
+            let mut opt_data = actor.behavior_data.remove(name);
+            let new_data = match opt_data {
+                Some(data) => behavior.stack_data(data),
+                None => behavior.init_data(),
+            };
+            actor.behavior_data.insert(name, new_data);
+            return Ok(());
+        }
+
+        ///completley remove the behavior and its data from an actor in the world.
+        pub fn remove_behavior(&mut self, id: usize, name: &'static str, map: &BehaviorMap<W, A>) -> Result<()> {
+            let behavior = map.get(name)
+                            .ok_or_else(|| anyhow!("Could not find key {} in behavior map", name))?;
+            let actor = self.actors.get_mut(&id).ok_or_else(|| {
+                                                    anyhow!("Could not find actor with id {} to add behavior {}",
+                                                            id,
+                                                            name)
+                                                })?;
+
+            for (type_id, matcher) in &behavior.matchers {
+                if let Some(listeners) = self.listeners.get_mut(&type_id) {
+                    let opt_idx = listeners.iter()
+                                        .position(|l| l.actor_id == id && l.behavior_key == name);
+                    if let Some(idx) = opt_idx {
+                        listeners.remove_index(idx);
+                    } else {
+                        bail!("Listener for actor with id {} and behavior named {} not found in world, \
+                            but removal was attempted",
+                            id,
+                            name);
+                    }
+                } else {
+                    bail!("No Listeners for behavior named {} found, but removal was attempted",
+                        name);
+                }
+            }
+
+            if let None = actor.behavior_data.remove(name) {
+                bail!("No behavior data found for actor with id {} and behavior name {}",
+                    id,
+                    name);
+            }
+            return Ok(());
+        }
+
+        pub fn iter(&self) -> impl Iterator<Item = (&usize, &Actor<W, A>)> {
+            return self.actors.iter();
+        }
+        pub fn iter_mut(&mut self) -> IterMut<'_, usize, Actor<W, A>> {
+            return self.actors.iter_mut();
+        }
+    }
+
+    impl<W, A> IntoIterator for World<W, A>
+        where A: ABounds<W>,
+            W: WBounds
+    {
+        type Item = (usize, Actor<W, A>);
+        type IntoIter = <BTreeMap<usize, Actor<W, A>> as IntoIterator>::IntoIter;
+        fn into_iter(self) -> Self::IntoIter {
+            return self.actors.into_iter();
+        }
+    }
+
+    #[derive(Debug)]
+    pub struct Event {
+        pub source:  usize,
+        pub targets: Vec<usize>,
+        pub data:    Box<dyn Any>,
+    }
+
+    impl Event {
+        pub fn new(source : usize, targets : Vec<usize>, data : Box<dyn Any>) -> Self {
+            return Event {source, targets, data}
+        }
+    }
+
+    /// matcher will run on events with the appropriate Type_Id and determine if the operator should be run or not.
+    pub type Matcher<W, A> = fn(usize, &World<W, A>, &Event, Option<&BehaviorData>) -> bool;
+    /// operator takes an event and mutates the world, then optionally returns a mutated event or None to stop propagation.
+    pub type Operator<W, A> = fn(usize, &mut World<W, A>, &mut Dispatcher, Event) -> Option<Event>;
+    /// initializer takes behavior data or None if the behavior was not already present on that actor, and initializes it or
+    /// modifies it as appropriate for gaining the behavior a second,third, or nth time.
+    pub type Initializer = fn(Option<BehaviorData>) -> Box<dyn Any>;
+
+    #[derive(Clone)]
+    pub struct Behavior<W, A>
+        where A: ABounds<W>,
+            W: WBounds
+    {
+        pub order:       i64,
+        pub statuses:    Vec<&'static str>,
+        pub matchers:    BTreeMap<std::any::TypeId, Matcher<W, A>>,
+        pub operator:    Operator<W, A>,
+        pub initializer: Initializer,
+    }
+
+    impl<W, A> Behavior<W, A>
+        where A: ABounds<W>,
+            W: WBounds
+    {
+        pub fn init_data(&self) -> BehaviorData {
+            BehaviorData { statuses: self.statuses.clone(),
+                        count:    1,
+                        data:     (self.initializer)(None), }
+        }
+        pub fn stack_data(&self, old: BehaviorData) -> BehaviorData {
+            BehaviorData { statuses: self.statuses.clone(),
+                        count:    1,
+                        data:     (self.initializer)(Some(old)), }
+        }
+    }
+
+    #[derive(Debug)]
+    pub struct BehaviorData {
+        ///statuses inflicted by effect
+        pub statuses: Vec<&'static str>,
+        pub count:    usize,
+        pub data:     Box<dyn Any>,
+    }
+
+    impl<W, A> Debug for Behavior<W, A>
+        where A: ABounds<W>,
+            W: WBounds
+    {
+        fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+            f.debug_struct("Behavior")
+            .field("order", &self.order)
+            .field("statuses", &self.statuses);
+            return std::fmt::Result::Ok(());
+        }
+    }
+
+    /// A map of names to behaviors
+    pub type BehaviorMap<W, A> = HashMap<&'static str, Behavior<W, A>>;
+
+
+    #[derive(Debug, Default)]
+    /// For dispatching events in the order they occur.
+    pub struct Dispatcher {
+        event_queue: VecDeque<Event>,
+    }
+
+    impl Dispatcher {
+        pub fn next(&mut self) -> Option<Event> {
+            return self.event_queue.pop_front();
+        }
+
+        pub fn dispatch(&mut self, event: Event) {
+            self.event_queue.push_back(event);
+        }
+    }
+
+    pub struct EventSystemCore<W,A>     
+    where A: ABounds<W>,
+        W: WBounds 
+    {
+        behaviors:    BehaviorMap<W, A>,
+        dispatcher:   Dispatcher,
+        world:        World<W, A>, 
+    }
+
+    impl<W,A> EventSystemCore<W,A> 
+    where A: ABounds<W>,
+        W: WBounds 
+    {
+        pub fn new() -> Self {
+            //currently its not possible to register additional behaviors 
+            //but if it becomes possible we need to make sure we don't overwrite any.
+            let behaviors = A::all_behaviors();
+            let dispatcher = Dispatcher { event_queue: VecDeque::new(), };
+            let world = World::<W, A>::default();
+            return EventSystemCore { behaviors,
+                                dispatcher,
+                                world,};
+        }
+
+        /// All keys in behaviors will be looked up in the event systems registered behaviors and added for this actor.
+        /// All Some() values in behaviors will be used as overrides for the behavior data, None will use the default.
+        pub fn add_actor(&mut self, actor_data: A, behaviors: Vec<(&'static str, Option<BehaviorData>)>) -> Result<usize> {
+            self.world.add_actor(actor_data, behaviors, &self.behaviors)
+        }
+
+        pub fn run_listeners(&mut self, mut event: Event) {
+            //odd syntax around type_id to get type_id of inner type, not of Box<EventData>
+            let opt_listeners = self.world.listeners.get(&(*event.data).type_id()).cloned();
+            if let Some(listeners) = opt_listeners {
+                for listener in listeners {
+                    let behavior_data = self.world.actors.get(&listener.actor_id)
+                        .expect("Listener with actor ID in world but actor is not")
+                        .behavior_data.get(listener.behavior_key);
+                    if (listener.matcher)(listener.actor_id, &self.world, &event, behavior_data) {
+                        if let Some(evt) = (self.behaviors.get(listener.behavior_key)
+                                    .expect("Listener with behavior key in world but no matching operator found in event system")
+                                    .operator)(listener.actor_id, &mut self.world, &mut self.dispatcher, event) {
+                            event = evt ;
+                        }
+                        else { break }
+                    }
+                }
+            };
+        }
+
+        pub fn world(&self) -> &World<W,A> {
+            return &self.world;
+        }
+    }
+
+    pub trait EventSystem<W,A> where W : WBounds, A : ABounds<W> {
+        /// run a turn or turns by calling actor.act() and place the returned event/events into some storage or 
+        /// run listeners on them immediately.
+        fn next(&mut self);
+        //do stuff that should happen before the first actor takes their turn, ie , setup turn order.
+        fn start(&mut self);
+        fn new() -> Self;
+        fn core(&self) -> &EventSystemCore<W,A>;
+        fn world(&self) -> &World<W,A> {
+            &self.core().world
+        }
+        ///used for default implementations of run_listeners and add_actor.
+        fn core_mut(&mut self)-> &mut EventSystemCore<W,A>;
+        /// EventSystemCore has a default implementation of run_listeners that will execute them in the order they 
+        /// were dispatched in. This can be altered if some other behavior is desired.
+        /// TODO : should this return a result? 
+        fn run_listeners(&mut self, event: Event) {
+            self.core_mut().run_listeners(event);
+        }
+        /// EventSystemCore has a default implementation that should be used. 
+        /// TODO : should this return a result?
+        fn add_actor(&mut self, actor_data: A, behaviors: Vec<(&'static str, Option<BehaviorData>)>) -> Result<usize> {
+            self.core_mut().add_actor(actor_data, behaviors)
+        }
+
+    }
+
+    pub struct SequentialEventSystem<W, A>
+        where A: ABounds<W>,
+            W: WBounds
+    {
+        turn_order:   VecDeque<usize>,
+        core : EventSystemCore<W,A>,
+        turn_counter: u64, 
+    }
+
+
+    //an event system could be a thing thats constructed on combat start
+    //from a subset of units in the world.
+    //uses a 'plan -> execute' style where actor.act is only given a &world, and is expected to return a list of events.
+    //an interactive system could be made where the same actor is allowed to act repeatedly until their turn ends.
+    impl<W, A> EventSystem<W, A> for SequentialEventSystem<W,A>
+        where A: ABounds<W>,
+            W: WBounds
+    {
+        fn new() -> Self {
+            let turn_order = VecDeque::new();
+            let core = EventSystemCore::new();
+            let turn_counter = 0;
+            return SequentialEventSystem { turn_order, core, turn_counter};
+        }
+
+        fn core(&self) -> &EventSystemCore<W,A> {
+            return &self.core;
+        }
+
+        fn core_mut(&mut self)-> &mut EventSystemCore<W,A> {
+            return &mut self.core;
+        }
+
+        fn start(&mut self) {
+            self.turn_order = self.core.world.actors.keys().map(|k| *k).collect::<VecDeque<usize>>();
+        }
+
+        fn next(&mut self) {
+            //run the next turn
+            let turn = self.turn_order.pop_front().unwrap();
+            let mut actor = self.core
+                                .world
+                                .actors
+                                .get(&turn)
+                                .expect("Actor with turn does not exist");
+            let evt = actor.act(turn, &self.core.world, &self.core.behaviors);
+            if let Some(event) = evt {
+                self.run_listeners(event);
+            }
+            // if let Some(e) = evt {
+            //     self.core.dispatcher.event_queue.push_back(e);
+            // }
+            // while let Some(event) = self.core.dispatcher.next() {
+            //     //dbg!(&event);
+            //     self.run_listeners(event);
+            // }
+            self.turn_counter += 1;
+            self.turn_order.push_back(turn);
+            // dbg!(&self.turn_counter);
+            // dbg!(&self.world);
+            
+        }
+
+
+    }
+
+```
+</CodeSnippet>
+
+Getting all the generics and bounds to compile was VERY tricky.  
+But doing things this way allows a library user to create a game / system with arbitrary `Actor` and `World` data, 
+and even implement their own Event System using `EventSystemCore`. 
+
+## Back To Goblins And Knights 
+
+To finish off this article I want to show how a working version of the goblin / knight fight looks using the event_sys 
+library - it's simpler than the one before though because I'm lazy and this article is already super long. 
+
+<CodeSnippet filename = 'basic_example.rs'>
+```rust 
+    use std::{any::{Any, TypeId}, collections::BTreeMap, rc::Rc};
+
+    use rand::random_range;
+
+    use crate::event_sys::*;
+
+    const TAKE_DAMAGE : &'static str = "TakeDamage";
+
+    #[derive(Debug)]
+    struct ActorData {
+        hp : i64
+    }
+
+    impl ActorData {
+        fn goblin() -> Self {
+            return Self{hp:4}
+        }
+        fn knight() -> Self {
+            return Self{hp:8}
+        }
+    }
+
+    #[derive(Default, Debug)]
+    struct WorldData {}
+
+    struct EventData { damage : i64 }
+
+    impl Act<WorldData,Self> for ActorData {
+        fn init(&self, self_id: usize, world: &World<WorldData, Self>, behaviors: &BehaviorMap<WorldData, Self>) -> Option<Event> {
+            return None
+        }
+
+        fn act(&self, self_id: usize, world: &World<WorldData, Self>, behaviors: &BehaviorMap<WorldData, Self>) -> Option<Event> {        
+            //find an actor in the world that isnt self
+            let others = world.iter().filter( |a| a.0 != &self_id ).map(|a| *a.0).collect::<Vec<usize>>();
+            let random_choice = others.get(random_range(0..others.len()));
+            if let Some(id) = random_choice {
+                //send a 'damage' event to it if we find one.
+                return Some(Event::new(self_id, vec![*id], Box::new( EventData { damage : 1 } )));
+            }
+            else {
+                return None;
+            }
+        }
+    }
+
+    impl ActorBehaviors<WorldData,Self> for ActorData {
+        fn all_behaviors() -> BehaviorMap<WorldData,Self> {
+            let mut map = BehaviorMap::new();
+            let mut matchers = BTreeMap::new();
+            matchers.insert( TypeId::of::<EventData>(), take_damage_matcher as Matcher<WorldData,Self>);
+            map.insert(TAKE_DAMAGE, Behavior {
+                initializer : take_damage_intializer,
+                matchers,
+                order: 0,
+                statuses : vec![],
+                operator : take_damage_operator
+            });
+            return map;
+        }
+    }
+
+    struct TakeDamageData();
+
+    fn take_damage_matcher(id : usize, w : &World<WorldData,ActorData>, event : &Event, behavior_data : Option<&BehaviorData>) -> bool {
+        //we can assume event is the correct type due to how listeners work
+        return event.targets.iter().find(|&target| target==&id).is_some() 
+    }
+
+    //if would be nice if operator could see what behaviors exist...
+    //also unwrap is too tempting when a result cant be returned, best to make this return a result.
+    fn take_damage_operator(id : usize, w : &mut World<WorldData,ActorData>, d : &mut Dispatcher, event : Event) -> Option<Event>{
+        let evt_data : &EventData = event.data.downcast_ref::<EventData>().expect("Operator was passed an event with the wrong type_id");
+        let actor = w.get_actor_mut(id).expect("Actor not found");
+        actor.inner.hp -= evt_data.damage;
+        return Some(event);
+    }
+
+    /// this behavior doesn't use special data so we just make up a zero sized type.
+    fn take_damage_intializer(o : Option<BehaviorData>) -> Box<dyn Any> {
+        return Box::new(TakeDamageData);
+    }
+
+    #[cfg(test)]
+    mod test
+    {
+        extern crate test;
+        use test::Bencher;
+
+        use crate::event_sys::*;
+        use super::*;
+
+        #[test]
+        fn tester()
+        {
+            let mut ses = SequentialEventSystem::<WorldData, ActorData>::new();
+            for i in 0..4 {
+                ses.add_actor(ActorData::goblin(), vec![(TAKE_DAMAGE, None)]);
+            }
+            let knight_id = ses.add_actor(ActorData::knight(), vec![(TAKE_DAMAGE, None)]).unwrap();
+            let mut knight_hp = ses.world().get_actor(knight_id).unwrap().inner.hp;
+            let mut living_goblins = ses.world().iter().filter( |a| a.0 != &knight_id && a.1.inner.hp > 0).count();
+            ses.start();
+            while knight_hp > 0 && living_goblins > 0 {
+                ses.next();
+                knight_hp = ses.world().get_actor(knight_id).unwrap().inner.hp;
+                living_goblins = ses.world().iter().filter( |a| a.0 != &knight_id && a.1.inner.hp > 0).count();
+                println!("{}", knight_hp);
+            }
+        }
+
+        #[bench]
+        fn bencher(b : &mut Bencher) 
+        {
+            b.iter(||{
+
+                });
+        }
+    }
+```
+</CodeSnippet>
+
+
+<CodeSnippet filename = 'game_server.rs'>
+```bash 
+   Compiling game_server v0.1.0 (~/Documents/Projects/Games/Adventure-Time/Application/game_server)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 0.53s
+     Running unittests src/lib.rs (target/debug/deps/chaos_lib-7299c9afbc1b382c)
+
+running 1 test
+8
+8
+7
+7
+7
+7
+7
+6
+6
+6
+6
+6
+5
+5
+5
+5
+5
+5
+5
+5
+4
+4
+4
+4
+4
+4
+4
+test examples::basic::test::tester ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 2 filtered out; finished in 0.00s
+```
+</CodeSnippet>
+
+Our knight clutches it out with half it's HP left!  
+
+I'm going to keep developing this out - there's still lots more to do before it's an actual game - but I'd be lying 
+if I said this went as quickly as I expected it to. 
+
+Thanks for reading!

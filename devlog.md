@@ -152,7 +152,7 @@ then
 in dolphin sftp://d@{server_ip}
 copy the files from ./frontend/dist over to ~/server/frontend/dist
 OR DO 
-rsync -a frontend/dist/* d@172.234.252.79:~/server/frontend/dist
+rsync -a frontend/dist/* d@{server_ip}:~/server/frontend/dist
 
     ssh d@{server_ip}
     sudo cp -r ~/server/frontend/dist /opt/server/frontend

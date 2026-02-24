@@ -23,7 +23,7 @@ let frontmatter : HomePageFrontmatter | undefined = props?.frontmatter;
 </div>
 <div class="pfp"></div>
 <div class="navigator">
-    <a target='_blank' href="https://www.youtube.com/channel/UCDp6SYcFblFx5udgwHe5Shg/featured">Youtube</a>
+    <a target='_blank' href="https://github.com/Daniel-A-Gutierrez">Github</a>
     <slot  name='link2'>{ frontmatter ? <a href = {frontmatter.leftlink} > {frontmatter.lefttext} </a> : <a>placeholder2</a>}</slot>
     <a class= 'pfp-placeholder' href="">&nbsp;</a>
     <slot  name='link3'>{ frontmatter ? <a href = {frontmatter.rightlink} > {frontmatter.righttext} </a> : <a>placeholder3</a>}</slot> 

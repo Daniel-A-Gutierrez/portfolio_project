@@ -420,21 +420,21 @@ etc.
 ## 4a. Sequential Combat 
 Lets work out a normal sequential system first, then I'll try the 'plan -> resolve' system. 
 Lets assume there's some sort of 'rules server' that stores the game state and runs the game loop.
-The 'combat runner' would be a state of the rule server.
+The 'combat runner' would be a state of the rule server.  
 The combat runner requests actions from the actor until it submits a 'end turn', is rendered unable to act, 
-or some timeout is reached,
-then it moves on to the next until only 1 faction remains or until no units are in the turn order. 
+or some timeout is reached, 
+then it moves on to the next until only 1 faction remains or until no units are in the turn order.  
 
 ## 4b. Parallel Combat 
-All units plan their turn at the same time. 
-A 'plan' acts on the world as it is at the end of the previous round. 
+All units plan their turn at the same time.   
+A 'plan' acts on the world as it is at the end of the previous round.   
 Players can add contingincies to their plan using 1 AP to react to a potential trigger - ie , 'attack another guy instead
-if the first one is already dead'.  
-During 'planning' players can insert 'theoretical' objects that don't exist yet, but that they can expect may exist. 
-IE two players formulate a plan to throw a bag, have the other player recieve it and do something with it in 1 round. 
+if the first one is already dead'.    
+During 'planning' players can insert 'theoretical' objects that don't exist yet, but that they can expect may exist.  
+IE two players formulate a plan to throw a bag, have the other player recieve it and do something with it in 1 round.  
 The second player needs to insert a theoretical version of the bag to act on on their turn, and if it isnt realized then 
-they need to plan a contingency for that or just lose the opportunity to act for the rest of their turn. 
-The turns resolve either in a semi random order or in order of the player character's haste stat. 
+they need to plan a contingency for that or just lose the opportunity to act for the rest of their turn.  
+The turns resolve either in a semi random order or in order of the player character's haste stat.  
 
 ## Abstractions 
 Actors should know how to 

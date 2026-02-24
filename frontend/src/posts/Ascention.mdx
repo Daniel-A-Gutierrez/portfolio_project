@@ -1,0 +1,561 @@
+---
+title : "Transcending My Humanity"
+description : "by becoming one with AI. /s Trying out n8n and claude code."
+preview : "/previews/lobster.svg"
+layout : '../layouts/ArticleLayout.astro'
+published : '2/18/2026'
+tags : ['AI']
+draft : true
+---
+import CodeSnippet from "/src/components/CodeSnippet.astro";
+import ArticleImage from "/src/components/ArticleImage.astro";
+import comfy1img from "/src/images/ascention/comfy-1.png"
+import comfy2img from "/src/images/ascention/comfy2.png"
+import comfy3img from "/src/images/ascention/comfy3.png"
+import comfytest1img from "/src/images/ascention/comfy-test1.png"
+import comfytest2img from "/src/images/ascention/comfy-test2.png"
+import comfytest3img from "/src/images/ascention/comfy-test3.png"
+import claude1 from "/src/images/ascention/claude1.png"
+import claude2 from "/src/images/ascention/claude2.png"
+import claude3 from "/src/images/ascention/claude3.png"
+import claude4 from "/src/images/ascention/claude4.png"
+
+When it comes to AI I suppose I'm something of a fence sitter - I don't really care about the brazen copyright violations, I think all code and technology should 
+be open source anyway, and that entertainment is best monetized not by gatekeeping its distribution but by incentivizing consumers to contribute to its creation.  
+
+Politics aside, I figured its about time I give some AI tools a spin and see if they live up to the hype.  
+I've already got Ollama running from some experiments in the past with Open WebUI running in a docker container 
+so I won't be going over that.   
+Instead I'll be trying out Stable Diffusion, N8N, and Claude Code in vscode.  
+Lets get started.
+
+# Stable Diffusion With Comfy 
+
+The guide [here](https://comfyui-wiki.com/en/install/install-comfyui/install-comfyui-on-linux) kept things pretty simple installation wise,
+then it was just a matter of running `comfy launch -- --port 4444 --lowvram` .
+
+The console is complaining with 
+<CodeSnippet filename="warning">
+```
+    [DEPRECATION WARNING] Detected import of deprecated legacy API: /scripts/ui.js. This is likely caused by a custom node extension using outdated APIs. Please update your extensions or contact the extension author for an updated version.
+```
+</CodeSnippet>
+
+But the web console is up and running.  
+
+<ArticleImage src={comfy1img} alt="comfy ui" />
+
+OK nice, comfy gives us a ton of templates to start from so we don't have to design our workflows from scratch.
+
+<ArticleImage src={comfy2img} alt="comfy ui" />
+
+Didn't notice I accidentally grabbed my start menu here but regardless, thats how the workflows look. All we 
+really need to change are the green and purple prompt boxes in the middle. 
+
+<ArticleImage src={comfy3img} alt="comfy ui" />
+
+While working on this though the 'load model' box broke, and after a bit of trial and error I ended up just 
+restarting comfy and it worked again. 
+
+<ArticleImage src={comfytest1img} alt="comfy ui" />
+
+The sanity check default prompt generated in a few seconds. I figured I'd generate a preview image for 
+this post so I prompted it with "A man transcending his humanity by integrating himself with AI tools like Gemini and Claude Code.
+
+<ArticleImage src={comfytest2img} alt="comfy ui" />
+
+Yeah no. Lets try something newer than stable diffusion 1.5 - like Qwen2512 !
+
+<ArticleImage src={comfytest3img} alt="comfy ui" />
+
+OK thats better! It took my 4070 super 6 minutes to generate though so ... I guess it's faster than a real artist at least. 
+
+There's more I could do here like video and audio generation and image editing but... it'd make me download dozens of gigabytes 
+more of models and I don't really plan on using this much so lets just move on. 
+
+
+# Claude Code 
+
+Just gonna give the documentation a quick skim first - to be honest I'm not even really sure what claude code **is**. 
+
+I made a copy of this entire repository, I want to see how well qwen can replicate the design of my website using 
+alternative frontend frameworks.
+
+
+<ArticleImage src={claude1} alt="editor screenshot"/>
+
+I took the new icon on the left and dragged it over to the right just for convenience's sake. 
+
+Ok well I've run into a problem - there's no way to set up the vscode extension to work with ollama. 
+Sooo.... I asked claude and it said 
+
+<CodeSnippet>
+```
+    The documentation explicitly states that Claude Code connects to Anthropic's API directly or through supported cloud providers. While you can configure a custom ANTHROPIC_BASE_URL for LLM gateways, these gateways must expose API formats compatible with Anthropic Messages, Bedrock InvokeModel, or Vertex rawPredict—not Ollama's API format.
+
+    If you need to use local models, you would need to use a different tool, as Claude Code is specifically built for Claude models.
+```
+</CodeSnippet>
+
+...
+
+Ok apparently theres now an 'ollama launch' command ? I'll have to update my ollama to use it but lets give it a try.
+
+<CodeSnippet>
+```
+    >ollama launch qwen3-coder:latest
+    Error: unknown integration: qwen3-coder:latest
+```
+</CodeSnippet>
+
+So the old models won't work? Following another guide, it instructed me to set my context length to 64k so 
+I ran `sudo systemctl edit ollama.service` and added an `Environment="OLLAMA_CONTEXT_LENGTH=64000"`.  
+
+Turns out you need to have claude code installed beforehand as well so lets run `curl -fsSL https://claude.ai/install.sh | bash` . 
+
+
+<ArticleImage src={claude2} alt="editor screenshot"/>
+
+OK! This is neat, lets see what we can get done with qwen3-30b.  
+Running `/init` to create the claude.md file for our 'master plan' 
+
+... 
+
+<ArticleImage src={claude3} alt="editor screenshot"/>
+
+Ok it really doesn't like 64k context, I think it crashed so I lowered the context to 16k.
+I have 48GB of ram and 12GB of VRAM so I thought itd be fine but I guess not.   
+Now it runs but... 
+
+<ArticleImage src={claude4} alt="editor screenshot"/>
+
+Wow thats a lot of talking and a whole lot of not making the Claude.md . 
+It seems to be broken somehow... I lowered the context down to 16k so that it could at least run but I think it's cooked.
+Maybe qwen3 30b is just not beefy enough to work as a coding assistant. 
+
+## Free Trial?
+
+I wonder if these services offer a free trial to work with.  
+
+...
+
+Seems like for a coding assistant you have to pay. I'm going to pay for ollama's pro service, which lets me 
+run qwen3-next, a 480b paramter model, for 20 dollars. 
+
+<ArticleImage src={ollama1} alt="editor screenshot"/>
+
+OK immediately thats far more useful. 
+
+## Updating My Website's CSS 
+
+This website's css isnt exactly clean. There's lots of use of global styles and overrides, which makes it 
+hard to tell what is styling what. Let's see if claude can clean that up for us. 
+
+Before anything else though I wanted to give it the ability to screenshot the page so it could actually 
+see what changes it was making and iterate. I asked it to develop this feedback loop on its own - and heres what it settled on. 
+
+<CodeSnippet filename="feedback.js">
+```js
+    #!/usr/bin/env node
+
+    /**
+    * Frontend Feedback Loop Tool
+    * 
+    * Captures screenshots and DOM metrics for frontend iteration feedback.
+    * Generates a feedback report in the feedback/ directory.
+    */
+
+    import { mkdirSync, writeFileSync } from 'fs';
+    import { join, dirname } from 'path';
+    import { fileURLToPath } from 'url';
+    import http from 'http';
+    import { exec } from 'child_process';
+    import playwright from 'playwright';
+
+    const __filename = fileURLToPath(import.meta.url);
+    const __dirname = dirname(__filename);
+    const projectRoot = join(__dirname, '..');
+    const feedbackDir = join(projectRoot, 'feedback');
+
+    // Configuration
+    const CONFIG = {
+    devServerPort: 4321,
+    devServerUrl: 'http://localhost:4321',
+    timeout: 30000,
+    screenshotFormat: 'png'
+    };
+
+    /**
+    * Check if dev server is running
+    */
+    function isServerRunning() {
+    return new Promise((resolve) => {
+        const url = new URL(CONFIG.devServerUrl);
+        const protocol = url.protocol === 'https:' ? https : http;
+        
+        const req = protocol.request({
+        hostname: 'localhost',
+        port: CONFIG.devServerPort,
+        timeout: 2000,
+        method: 'GET',
+        path: '/'
+        }, (res) => {
+        res.resume();
+        resolve(true);
+        });
+
+        req.on('error', () => resolve(false));
+        req.on('timeout', () => {
+        req.destroy();
+        resolve(false);
+        });
+        req.end();
+    });
+    }
+
+    /**
+    * Start the Astro dev server
+    */
+    function startDevServer() {
+    return new Promise((resolve, reject) => {
+        console.log('Starting Astro dev server...');
+        
+        // Check if already running first
+        isServerRunning().then((running) => {
+        if (running) {
+            console.log('Dev server is already running on port', CONFIG.devServerPort);
+            resolve(null);
+            return;
+        }
+
+        const child = exec('yarn dev', {
+            cwd: projectRoot,
+            detached: true,
+            stdio: 'ignore'
+        });
+
+        child.unref();
+
+        // Wait for server to be ready
+        let attempts = 0;
+        const maxAttempts = 15;
+
+        const checkServer = () => {
+            attempts++;
+            console.log(`Waiting for dev server... (${attempts}/${maxAttempts})`);
+            
+            isServerRunning().then((running) => {
+            if (running) {
+                console.log('Dev server is ready!');
+                resolve(child);
+            } else if (attempts >= maxAttempts) {
+                reject(new Error('Dev server failed to start'));
+            } else {
+                setTimeout(checkServer, 1000);
+            }
+            });
+        };
+
+        setTimeout(checkServer, 2000);
+        });
+    });
+    }
+
+    /**
+    * Stop the dev server
+    */
+    function stopDevServer(server) {
+    if (server && server.pid) {
+        console.log('Stopping dev server...');
+        try {
+        process.kill(-server.pid);
+        } catch (e) {
+        // Ignore errors
+        }
+    }
+    }
+
+    /**
+    * Extract DOM metrics from the page
+    */
+    function extractDomMetrics(page) {
+        ...// lots of console.logging , abridging for blog brevity
+    }
+
+    /**
+    * Capture screenshots
+    */
+    async function captureScreenshots(page, screenshotName) {
+    const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
+    const filename = `${screenshotName}-${timestamp}`;
+    
+    // Full page screenshot
+    const fullPath = join(feedbackDir, `${filename}-full.${CONFIG.screenshotFormat}`);
+    await page.screenshot({
+        path: fullPath,
+        fullPage: true
+    });
+    console.log(`Full page screenshot saved: ${fullPath}`);
+
+    // Viewport screenshot
+    const viewportPath = join(feedbackDir, `${filename}-viewport.${CONFIG.screenshotFormat}`);
+    await page.screenshot({
+        path: viewportPath,
+        fullPage: false
+    });
+    console.log(`Viewport screenshot saved: ${viewportPath}`);
+
+    return {
+        fullPage: fullPath,
+        viewport: viewportPath
+    };
+    }
+
+    /**
+    * Generate feedback report
+    */
+    function generateReport(metrics, screenshots, timestamp) {
+    const report = {
+        timestamp,
+        url: CONFIG.devServerUrl,
+        metrics,
+        screenshots,
+        summary: {
+        elementCount: metrics.totalElements,
+        imageCount: metrics.images.count,
+        linkCount: metrics.links,
+        buttonCount: metrics.buttons,
+        maxDomDepth: metrics.maxDomDepth,
+        totalTextLength: metrics.totalTextLength,
+        viewportDimensions: `${metrics.viewport.width}x${metrics.viewport.height}`,
+        documentDimensions: `${metrics.documentSize.width}x${metrics.documentSize.height}`
+        }
+    };
+
+    const reportPath = join(feedbackDir, `feedback-report-${timestamp}.json`);
+    writeFileSync(reportPath, JSON.stringify(report, null, 2));
+    console.log(`\nFeedback report saved: ${reportPath}`);
+
+    return report;
+    }
+
+    /**
+    * Print report summary to console
+    */
+    function printSummary(report) { 
+        //more logging, abridging for blod.
+    }
+
+    /**
+    * Main function
+    */
+    async function main() {
+    const timestamp = new Date().toISOString();
+    let serverProcess = null;
+
+    // Ensure feedback directory exists
+    mkdirSync(feedbackDir, { recursive: true });
+
+    console.log('Frontend Feedback Loop Tool');
+    console.log('===========================\n');
+
+    try {
+        // Start dev server if not running
+        serverProcess = await startDevServer();
+
+        // Give server a moment to fully initialize
+        await new Promise(resolve => setTimeout(resolve, 2000));
+
+        // Launch browser
+        console.log('Launching browser...');
+        const browser = await playwright.chromium.launch({
+        headless: true
+        });
+
+        const context = await browser.newContext({
+        viewport: { width: 1920, height: 1080 }
+        });
+
+        const page = await context.newPage();
+
+        // Navigate to homepage
+        console.log(`Navigating to ${CONFIG.devServerUrl}...`);
+        await page.goto(CONFIG.devServerUrl, {
+        waitUntil: 'networkidle',
+        timeout: CONFIG.timeout
+        });
+
+        // Wait for any animations to complete
+        await page.waitForTimeout(1000);
+
+        // Capture screenshots
+        console.log('\nCapturing screenshots...');
+        const screenshots = await captureScreenshots(page, 'homepage');
+
+        // Extract DOM metrics
+        console.log('Extracting DOM metrics...');
+        const metrics = await extractDomMetrics(page);
+
+        // Generate report
+        const report = generateReport(metrics, screenshots, timestamp);
+
+        // Print summary to console
+        printSummary(report);
+
+        // Close browser
+        await browser.close();
+
+        console.log('\nFeedback collection complete!');
+        console.log(`View screenshots and full report in: ${feedbackDir}`);
+
+    } catch (error) {
+        console.error('Error during feedback collection:', error.message);
+        if (error.stack) {
+        console.error(error.stack);
+        }
+        process.exit(1);
+    } finally {
+        // Stop dev server if we started it
+        stopDevServer(serverProcess);
+    }
+    }
+
+    main();
+
+```
+</CodeSnippet>
+
+It took it a few tries fighting node and I had to keep it from reinstalling playwright but it works fantastically,
+I can see the screenshots. I had it add the ability to take screenshots at multiple page widths then let it loose on the css.
+
+...
+
+All done, ok lets evaluate. 
+
+<ArticleImage src={ollama2} alt="editor screenshot"/>
+
+Oops, I don't know why I let it delete the old screenshots, I guess I trusted that it had verified things matched 
+and that they weren't needed anymore, but it did make some mistakes so I started up the original copy's dev server 
+and fed it the port so it could take screenshots of the original. 
+
+<ArticleImage src={ollama3} alt="editor screenshot"/>
+
+Ok thats still not quite right... 
+
+
+<ArticleImage src={ollama4} alt="editor screenshot"/>
+
+
+<CodeSnippet filename="feedback.js">
+```bash
+    ● The desktop view shows the image on the right and content on the left, which matches the original desktop layout from
+    before-desktop.png.
+
+    The fix for the mobile layout is complete. Here's what was changed:
+
+    RedditStylePreview.astro - Fixed the mobile ordering issue:
+    - On mobile: Image now appears first in the HTML (and thus at the top visually), followed by the content (title, description,
+    read more)
+    - On desktop (750px+): Image appears on the right side with content on the left (same as before)
+    - The responsive breakpoint at 750px properly switches between the two layouts
+
+    ✻ Crunched for 2m 11s
+
+    ❯ I think you had it at one point, but its back on the left. Make sure to use a media query to distinguish the mobile from         
+    desktop and change the order css property based on that.       
+```
+</CodeSnippet>
+                                                                 
+Ok its hallucinating a bit. It did have the correct layout at one point but then it messed it up - its 
+not using a media query when it should be so I'll tell it to do that explicitly. 
+
+<ArticleImage src={ollama5} alt="editor screenshot"/>
+
+
+<CodeSnippet filename="feedback.js">
+```
+    ❯ Ok good, this is an improvement. I want you to now make sure that all the images are all the same size and aspect ratio, and     
+    not overflowing on mobile. On mobile they should be as wide as the screenwidth with a tiny margin, on desktop they should      
+    be square with the same height as the article preview card, which I believe I set a fixed value for.                             
+                                                                                                                                    
+    ● Let me check the original screenshots to understand the expected layout:                                                         
+                                                                
+    ● Read 3 files (ctrl+o to expand)                                                                                                  
+                                                
+    ● I see the issue. The current setup:                                                                                              
+    - Mobile: Image is 250px tall but width: 100% - this makes it full width (which is correct), but I need to add margin          
+    - Desktop: Image is 250x250px but the container is also 250px - this should be square
+```
+</CodeSnippet>
+
+<ArticleImage src={ollama6} alt="editor screenshot"/>
+
+❯ The image sizing is fixed on desktop, but not on mobile. On desktop the image is to the left of the article header when it should be to the right on desktop, but the sizing is good. On mobile the image is in the incorrect place and it remains      
+  at 250pxx250px when it should be (for example) , 95% width with a square aspect ratio and margin auto or something to center it. 
+
+
+<CodeSnippet filename="ai thoughts.js">
+```
+    ● Looking at the screenshots:
+                                                                                                                                                                                                                                                
+    Before-mobile.png - Shows: Image on top, content below (correct layout for mobile)                                                                                                                                                       
+    Before-desktop.png - Shows: Image on left, content on right (so image should be on the LEFT, not right)                                                                                                                                    
+    
+    Wait, I need to re-read your message. You said "The image is to the left of the article header when it should be to the right on desktop". Let me look more carefully at before-desktop to understand the original intended layout:        
+                                                                                                                                                                                                                                            
+    Looking at the before-desktop.png again - it shows the image on the left side. But you want it on the right. Let me verify my current setup is correct:
+
+    In my current code, on desktop:
+    - order: 2 for image (right side)
+    - order: 1 for content (left side)
+
+    But before-desktop showed image on left. So either:
+    1. The original had image on left and you want it on right, OR
+    2. The original had image on right and I misread
+
+    Let me re-read: "The image is to the left of the article header when it should be to the right on desktop"
+
+    So you want image on the RIGHT. My current setup has:
+    - order: 2 for image (right)
+    - order: 1 for content (left)
+
+    That's correct. Let me verify the new screenshot shows this:
+
+    ● Read 2 files (ctrl+o to expand)   
+```
+</CodeSnippet>
+
+It's very interesting seeing this thing think.  
+It doesn't seem like it'll be able to fix this problem though so I had to intervene 
+
+    ❯ I see the problem - the image's parent needs to have its height set to 100% so that it fills up its container, which has a determined     
+   max height. Then the image will cover the entire space that it needs to.   
+                                                 
+<ArticleImage src={ollama7} alt="editor screenshot"/>
+
+Yeah no this thing just isn't very good at css. A shame. 
+It added extra overflow rules and set the min-width and min-height of the parent using viewport width. 
+Let's give up on this for now. 
+
+I was hoping the visual feedback mechanism would be helpful - and maybe it was, I don't have a control 
+for this afterall, but it still commits totally broken code and says its 'correct'. 
+
+I was going to have it translate my frontend into different frameworks to see how it might look but 
+I don't think that's feasible if it cant even succesfully replicate the same appearance with the same tools 
+and starting with the original source code. 
+
+Maybe frontend work isn't its forte, lets try something else.
+
+## 
+
+# n8n 
+
+Ok well while claude code downloads I may as well get started with n8n.  
+Its easy enough to download with docker desktop and docker hub - just [go here](https://hub.docker.com/r/n8nio/n8n). 
+
+
+
+<CodeSnippet filename="feedback.js">
+```
+```
+</CodeSnippet>
