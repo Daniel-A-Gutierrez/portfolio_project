@@ -158,6 +158,7 @@ rsync -a frontend/dist/* d@{server_ip}:~/server/frontend/dist
     sudo cp -r ~/server/frontend/dist /opt/server/frontend
     sudo systemctl restart portfolio-server
 then in cloudflare enable developer mode to turn off caching
+sometimes this won't work if the yarn build fails.
 
 # to update the backend 
 in dolphin sftp://d@{server_ip} 
